@@ -2,8 +2,8 @@
 import express from 'express';
 import { body } from 'express-validator';
 import bcrypt from 'bcryptjs';
-import db from '../lib/db.js';
-import { apiResponse, asyncHandler, generateToken } from '../lib/utils.js';
+import db from '../libs/db.js';
+import { apiResponse, asyncHandler, generateToken } from '../libs/utils.js';
 import { validateRequest } from '../middleware/validator.js';
 
 const router = express.Router();

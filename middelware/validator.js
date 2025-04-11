@@ -1,6 +1,6 @@
 // middleware/validator.js
 import { validationResult } from 'express-validator';
-import { apiResponse } from '../lib/utils.js';
+import { apiResponse } from '../libs/utils.js';
 
 export const validateRequest = (validations) => {
   return async (req, res, next) => {
