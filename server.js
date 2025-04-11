@@ -4,7 +4,7 @@ import cors from 'cors';
 import helmet from 'helmet';
 import morgan from 'morgan';
 import dotenv from 'dotenv';
-import { errorHandler } from './lib/utils.js';
+import { errorHandler } from './libs/utils.js';
 
 // Routes
 import userRoutes from './routes/users.js';
