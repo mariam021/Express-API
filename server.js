@@ -10,7 +10,7 @@ import { errorHandler } from './libs/utils.js';
 import userRoutes from './routes/users.js';
 import contactRoutes from './routes/contacts.js';
 import phoneNumberRoutes from './routes/phoneNumbers.js';
-import authRoutes from './routes/auth.js';
+import authRoutes from './libs/auth.js';
 
 // Load environment variables
 dotenv.config();
