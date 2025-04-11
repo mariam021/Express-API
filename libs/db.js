@@ -1,3 +1,20 @@
+import pg from 'pg';
+const { Pool } = pg;
+
+// Railway provides DATABASE_URL, not POSTGRES_URL
+const connectionString = process.env.DATABASE_URL;
+
+
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL,
+  ssl: {
+    rejectUnauthorized: false  // Required for Supabase
+  }
+});
+
+
+
+/*
 // lib/db.js
 import pg from 'pg';
 const { Pool } = pg;
@@ -8,7 +25,7 @@ const pool = new Pool({
   ssl: process.env.NODE_ENV === 'production' ? {
     rejectUnauthorized: false
   } : false
-});
+});*/
 
 // Test connection
 pool.query('SELECT NOW()', (err) => {
