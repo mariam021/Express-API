@@ -11,10 +11,10 @@ const router = express.Router();
 router.use(authenticate);
 
 // Get all contacts for a user
-router.get('/',
+router.get('/users/:user_id',
   paginate,
   validateRequest([
-    query('user_id').optional().isInt().toInt()
+    param('user_id').isInt().toInt()
   ]),
   asyncHandler(async (req, res) => {
     // Get user_id from query or from authenticated user
@@ -27,10 +27,22 @@ router.get('/',
     
     const { limit, offset } = req.pagination;
     
+    // Get contacts with pagination
     const contacts = await db.query(
-      `SELECT * FROM contacts
-       WHERE user_id = $1
-       ORDER BY is_emergency DESC, name ASC
+      `SELECT 
+        c.id,
+        c.name,
+        c.is_emergency,
+        c.relationship,
+        c.image,
+        c.created_at,
+        c.updated_at,
+        COUNT(p.id) as phone_count
+       FROM contacts c
+       LEFT JOIN contact_phone_numbers p ON c.id = p.contact_id
+       WHERE c.user_id = $1
+       GROUP BY c.id
+       ORDER BY c.is_emergency DESC, c.name ASC
        LIMIT $2 OFFSET $3`,
       [user_id, limit, offset]
     );
@@ -43,16 +55,27 @@ router.get('/',
     
     const totalCount = parseInt(countResult.rows[0].count);
     
-    const contactsWithPhones = await Promise.all(
-      contacts.rows.map(async contact => {
-        const phones = await db.query(
-          `SELECT * FROM contact_phone_numbers
-           WHERE contact_id = $1`,
-          [contact.id]
-        );
-        return { ...contact, phone_numbers: phones.rows };
-      })
-    );
+    // Get phone numbers for all contacts in a single query
+    const contactIds = contacts.rows.map(c => c.id);
+    let phones = [];
+    
+    if (contactIds.length > 0) {
+      const phonesResult = await db.query(
+        `SELECT * FROM contact_phone_numbers
+         WHERE contact_id = ANY($1)
+         ORDER BY is_primary DESC, phone_type ASC`,
+        [contactIds]
+      );
+      phones = phonesResult.rows;
+    }
+    
+    // Combine contacts with their phone numbers
+    const contactsWithPhones = contacts.rows.map(contact => {
+      return {
+        ...contact,
+        phone_numbers: phones.filter(p => p.contact_id === contact.id)
+      };
+    });
     
     apiResponse(res, 200, {
       contacts: contactsWithPhones,
@@ -89,7 +112,9 @@ router.get('/:id',
     }
     
     const phones = await db.query(
-      `SELECT * FROM contact_phone_numbers WHERE contact_id = $1`,
+      `SELECT * FROM contact_phone_numbers 
+       WHERE contact_id = $1
+       ORDER BY is_primary DESC, phone_type ASC`,
       [id]
     );
     
@@ -128,19 +153,28 @@ router.post('/',
       
       // Insert phone numbers if provided
       if (phone_numbers.length > 0) {
-        for (const phone of phone_numbers) {
-          await client.query(
-            `INSERT INTO contact_phone_numbers
-             (contact_id, phone_number, phone_type, is_primary)
-             VALUES ($1, $2, $3, $4)`,
-            [contact.id, phone.phone_number, phone.phone_type || 'mobile', phone.is_primary || false]
-          );
-        }
+        const phoneValues = phone_numbers.map(phone => [
+          contact.id,
+          phone.phone_number,
+          phone.phone_type || 'mobile',
+          phone.is_primary || false
+        ]);
+        
+        await client.query(
+          `INSERT INTO contact_phone_numbers
+           (contact_id, phone_number, phone_type, is_primary)
+           VALUES ${phoneValues.map((_, i) => 
+             `($${i*4+1}, $${i*4+2}, $${i*4+3}, $${i*4+4})`
+           ).join(',')}`,
+          phoneValues.flat()
+        );
       }
       
       // Get full contact with phones
       const phones = await client.query(
-        'SELECT * FROM contact_phone_numbers WHERE contact_id = $1',
+        `SELECT * FROM contact_phone_numbers 
+         WHERE contact_id = $1
+         ORDER BY is_primary DESC, phone_type ASC`,
         [contact.id]
       );
       
@@ -159,11 +193,12 @@ router.put('/:id',
     body('name').optional().trim().notEmpty(),
     body('is_emergency').optional().isBoolean(),
     body('relationship').optional().trim(),
-    body('image').optional().trim()
+    body('image').optional().trim(),
+    body('phone_numbers').optional().isArray()
   ]),
   asyncHandler(async (req, res) => {
     const { id } = req.params;
-    const { name, is_emergency, relationship, image } = req.body;
+    const { name, is_emergency, relationship, image, phone_numbers } = req.body;
     
     // Check if contact belongs to user
     const contactCheck = await db.query(
@@ -179,19 +214,64 @@ router.put('/:id',
       return apiResponse(res, 403, null, 'Not authorized to update this contact');
     }
     
-    const result = await db.query(
-      `UPDATE contacts SET
-        name = COALESCE($1, name),
-        is_emergency = COALESCE($2, is_emergency),
-        relationship = COALESCE($3, relationship),
-        image = COALESCE($4, image),
-        updated_at = NOW()
-       WHERE id = $5
-       RETURNING *`,
-      [name, is_emergency, relationship, image, id]
-    );
-    
-    apiResponse(res, 200, result.rows[0], 'Contact updated successfully');
+    await db.transaction(async (client) => {
+      // Update contact
+      const result = await client.query(
+        `UPDATE contacts SET
+          name = COALESCE($1, name),
+          is_emergency = COALESCE($2, is_emergency),
+          relationship = COALESCE($3, relationship),
+          image = COALESCE($4, image),
+          updated_at = NOW()
+         WHERE id = $5
+         RETURNING *`,
+        [name, is_emergency, relationship, image, id]
+      );
+      
+      const contact = result.rows[0];
+      
+      // Update phone numbers if provided
+      if (phone_numbers) {
+        // Delete existing phone numbers
+        await client.query(
+          `DELETE FROM contact_phone_numbers
+           WHERE contact_id = $1`,
+          [id]
+        );
+        
+        // Insert new phone numbers
+        if (phone_numbers.length > 0) {
+          const phoneValues = phone_numbers.map(phone => [
+            id,
+            phone.phone_number,
+            phone.phone_type || 'mobile',
+            phone.is_primary || false
+          ]);
+          
+          await client.query(
+            `INSERT INTO contact_phone_numbers
+             (contact_id, phone_number, phone_type, is_primary)
+             VALUES ${phoneValues.map((_, i) => 
+               `($${i*4+1}, $${i*4+2}, $${i*4+3}, $${i*4+4})`
+             ).join(',')}`,
+            phoneValues.flat()
+          );
+        }
+      }
+      
+      // Get updated contact with phones
+      const phones = await client.query(
+        `SELECT * FROM contact_phone_numbers 
+         WHERE contact_id = $1
+         ORDER BY is_primary DESC, phone_type ASC`,
+        [id]
+      );
+      
+      apiResponse(res, 200, {
+        ...contact,
+        phone_numbers: phones.rows
+      }, 'Contact updated successfully');
+    });
   })
 );
 
