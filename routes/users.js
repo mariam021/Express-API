@@ -70,6 +70,7 @@ router.put('/:id',
     body('phone_number').optional().isMobilePhone(),
     body('image').optional().isURL()
   ]),
+  
   asyncHandler(async (req, res) => {
     const { id } = req.params;
     const { name, password, age, mac, phone_number, image } = req.body;

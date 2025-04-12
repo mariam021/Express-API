@@ -26,6 +26,7 @@ export const asyncHandler = (fn) => (req, res, next) => {
 };
 
 // JWT middleware for authentication
+/*
 export const authenticate = (req, res, next) => {
   try {
     const authHeader = req.headers.authorization;
@@ -41,12 +42,31 @@ export const authenticate = (req, res, next) => {
     return apiResponse(res, 401, null, 'Invalid or expired token');
   }
 };
-
-// JWT token generator
-export const generateToken = (payload, expiresIn = '24h') => {
-  return jwt.sign(payload, process.env.JWT_SECRET, { expiresIn });
+*/
+export const authenticate = (req, res, next) => {
+  try {
+    const token = req.header('Authorization')?.replace('Bearer ', '');
+    
+    if (!token) throw new Error('Authentication required');
+    
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    req.user = { userId: decoded.userId }; // Ensure this matches your token payload
+    next();
+  } catch (err) {
+    apiResponse(res, 401, null, err.message);
+  }
 };
 
+// JWT token generator
+/*
+export const generateToken = (payload, expiresIn = '24h') => {
+  return jwt.sign(payload, process.env.JWT_SECRET, { expiresIn });
+};*/
+export const generateToken = (payload) => {
+  return jwt.sign(payload, process.env.JWT_SECRET, { 
+    expiresIn: '24h' 
+  });
+};
 // Sanitize phone number format
 export const sanitizePhoneNumber = (phone) => {
   if (!phone) return null;
