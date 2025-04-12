@@ -7,10 +7,13 @@ import { apiResponse, asyncHandler, authenticate } from '../libs/utils.js';
 import { validateRequest } from '../middleware/validator.js';
 
 const router = express.Router();
+
+// List all API endpoints
 router.get('/', (req, res) => {
   res.json({
     message: "Users API Endpoints",
     endpoints: {
+      get_all_users: "GET /all",
       get_current_user: "GET /me (requires auth)",
       get_user_by_id: "GET /:id",
       update_user: "PUT /:id (requires auth)",
@@ -18,12 +21,49 @@ router.get('/', (req, res) => {
     }
   });
 });
+
+// Get all users (paginated)
+router.get('/all',
+  asyncHandler(async (req, res) => {
+    // Get pagination parameters from query string
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 10;
+    const offset = (page - 1) * limit;
+
+    // Get total count of users
+    const countResult = await db.query('SELECT COUNT(*) FROM users');
+    const total = parseInt(countResult.rows[0].count);
+    const totalPages = Math.ceil(total / limit);
+
+    // Get paginated users
+    const result = await db.query(
+      `SELECT id, name, age, mac, phone_number as "phoneNumber", image, created_at as "createdAt"
+       FROM users 
+       ORDER BY created_at DESC
+       LIMIT $1 OFFSET $2`,
+      [limit, offset]
+    );
+
+    apiResponse(res, 200, {
+      data: result.rows,
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages,
+        hasNext: page < totalPages,
+        hasPrevious: page > 1
+      }
+    });
+  })
+);
+
 // Get current user profile
 router.get('/me', 
   authenticate,
   asyncHandler(async (req, res) => {
     const result = await db.query(
-      `SELECT id, name, age, mac, phone_number, image
+      `SELECT id, name, age, mac, phone_number as "phoneNumber", image
        FROM users WHERE id = $1`,
       [req.user.userId]
     );
@@ -45,7 +85,7 @@ router.get('/:id',
     const { id } = req.params;
     
     const result = await db.query(
-      `SELECT id, name, age, mac, phone_number, image
+      `SELECT id, name, age, mac, phone_number as "phoneNumber", image
        FROM users WHERE id = $1`,
       [id]
     );
@@ -132,7 +172,7 @@ router.put('/:id',
       UPDATE users SET
         ${updates.join(', ')}
       WHERE id = $${counter}
-      RETURNING id, name, age, mac, phone_number, image
+      RETURNING id, name, age, mac, phone_number as "phoneNumber", image
     `;
     
     const result = await db.query(query, values);
