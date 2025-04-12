@@ -7,7 +7,17 @@ import { apiResponse, asyncHandler, authenticate } from '../libs/utils.js';
 import { validateRequest } from '../middleware/validator.js';
 
 const router = express.Router();
-
+router.get('/', (req, res) => {
+  res.json({
+    message: "Users API Endpoints",
+    endpoints: {
+      get_current_user: "GET /me (requires auth)",
+      get_user_by_id: "GET /:id",
+      update_user: "PUT /:id (requires auth)",
+      delete_user: "DELETE /:id (requires auth)"
+    }
+  });
+});
 // Get current user profile
 router.get('/me', 
   authenticate,
