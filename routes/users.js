@@ -13,6 +13,7 @@ router.get('/', (req, res) => {
   res.json({
     message: "Users API Endpoints",
     endpoints: {
+      create_user: "POST /",
       get_all_users: "GET /all",
       get_current_user: "GET /me (requires auth)",
       get_user_by_id: "GET /:id",
@@ -21,6 +22,45 @@ router.get('/', (req, res) => {
     }
   });
 });
+
+// Create new user
+router.post('/',
+  validateRequest([
+    body('name').trim().notEmpty().withMessage('Name is required'),
+    body('password').isLength({ min: 6 }).withMessage('Password must be at least 8 characters'),
+    body('age').optional().isInt({ min: 1 }).withMessage('Age must be a positive integer'),
+    body('mac').optional().isMACAddress().withMessage('Invalid MAC address format'),
+    body('phone_number').isMobilePhone().withMessage('Invalid phone number'),
+    body('image').optional().isURL().withMessage('Invalid image URL')
+  ]),
+  asyncHandler(async (req, res) => {
+    const { name, password, age, mac, phone_number, image } = req.body;
+
+    // Check if user already exists (by phone number)
+    const existingUser = await db.query(
+      'SELECT id FROM users WHERE phone_number = $1',
+      [phone_number]
+    );
+
+    if (existingUser.rows.length > 0) {
+      return apiResponse(res, 409, null, 'User with this phone number already exists');
+    }
+
+    // Hash password
+    const hashedPassword = await bcrypt.hash(password, 10);
+
+    // Insert new user
+    const result = await db.query(
+      `INSERT INTO users 
+       (name, password, age, mac, phone_number, image) 
+       VALUES ($1, $2, $3, $4, $5, $6) 
+       RETURNING id, name, age, mac, phone_number as "phoneNumber", image`,
+      [name, hashedPassword, age, mac, phone_number, image]
+    );
+
+    apiResponse(res, 201, result.rows[0], 'User created successfully');
+  })
+);
 
 // Get all users (paginated)
 router.get('/all',
