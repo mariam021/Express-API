@@ -18,7 +18,8 @@ router.get('/', (req, res) => {
       get_current_user: "GET /me (requires auth)",
       get_user_by_id: "GET /:id",
       update_user: "PUT /:id (requires auth)",
-      delete_user: "DELETE /:id (requires auth)"
+      delete_user: "DELETE /:id (requires auth)",
+      login: "POST /login"
     }
   });
 });
@@ -92,6 +93,48 @@ router.get('/all',
         totalPages,
         hasNext: page < totalPages,
         hasPrevious: page > 1
+      }
+    });
+  })
+);
+
+// User Login
+router.post('/login',
+  validateRequest([
+    body('phone_number').isMobilePhone().withMessage('Invalid phone number'),
+    body('password').isLength({ min: 6 }).withMessage('Password must be at least 6 characters')
+  ]),
+  asyncHandler(async (req, res) => {
+    const { phone_number, password } = req.body;
+
+    // 1. Find user by phone number
+    const userResult = await db.query(
+      `SELECT id, name, password FROM users WHERE phone_number = $1`,
+      [phone_number]
+    );
+
+    if (userResult.rows.length === 0) {
+      return apiResponse(res, 401, null, 'Invalid credentials');
+    }
+
+    const user = userResult.rows[0];
+
+    // 2. Verify password
+    const isPasswordValid = await bcrypt.compare(password, user.password);
+    if (!isPasswordValid) {
+      return apiResponse(res, 401, null, 'Invalid credentials');
+    }
+
+    // 3. Generate JWT token (assuming you have a function for this)
+    const token = generateToken({ userId: user.id }); // Replace with your token generation logic
+
+    // 4. Return token + user data (excluding password)
+    apiResponse(res, 200, {
+      token,
+      user: {
+        id: user.id,
+        name: user.name,
+        phoneNumber: phone_number
       }
     });
   })
