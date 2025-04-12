@@ -20,7 +20,7 @@ router.get('/', (req, res) => {
 });
 // Get current user profile
 router.get('/me', 
-  //authenticate,
+  authenticate,
   asyncHandler(async (req, res) => {
     const result = await db.query(
       `SELECT id, name, age, mac, phone_number, image
@@ -60,7 +60,7 @@ router.get('/:id',
 
 // Update user
 router.put('/:id',
-  //authenticate,
+  authenticate,
   validateRequest([
     param('id').isInt().toInt(),
     body('name').optional().trim().notEmpty(),
