@@ -25,7 +25,7 @@ router.get('/', (req, res) => {
 });
 
 // Create new user
-router.post('/',
+router.post('/singup',
   validateRequest([
     body('name').trim().notEmpty().withMessage('Name is required'),
     body('password').isLength({ min: 6 }).withMessage('Password must be at least 8 characters'),
