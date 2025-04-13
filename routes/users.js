@@ -28,7 +28,7 @@ router.get('/', (req, res) => {
 router.post('/singup',
   validateRequest([
     body('name').trim().notEmpty().withMessage('Name is required'),
-    body('password').isLength({ min: 6 }).withMessage('Password must be at least 8 characters'),
+    body('password').isLength({ min: 8 }).withMessage('Password must be at least 8 characters'),
     body('age').optional().isInt({ min: 1 }).withMessage('Age must be a positive integer'),
     body('mac').optional().isMACAddress().withMessage('Invalid MAC address format'),
     body('phone_number').isMobilePhone().withMessage('Invalid phone number'),
