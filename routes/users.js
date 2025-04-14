@@ -137,7 +137,7 @@ router.post('/login',
       .isLength({ min: 11 })
       .withMessage('Phone number must be 11 digits'),
     body('password')
-      .isLength(11)
+      .isLength({ min: 8 })
       .withMessage('Password must be at least 8 characters')
   ]),
   asyncHandler(async (req, res) => {
