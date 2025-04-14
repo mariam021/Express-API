@@ -127,14 +127,13 @@ router.get('/all',
 );
 
 // User Login
-// routes/users.js - Updated Login Endpoint
 router.post('/login',
   validateRequest([
     body('phone_number')
       .trim()
       .notEmpty().withMessage('Phone number is required')
-      .customSanitizer(value => value.replace(/[^\d+]/g, '')) // Remove non-digit characters
-      .isLength({ min: 8, max: 15 }).withMessage('Phone number must be 8-15 digits'),
+      .customSanitizer(value => value.replace(/[^\d+]/g, ''))
+      .isLength({ min: 11, max: 11 }).withMessage('Phone number must be exactly 11 digits'),
     body('password')
       .isLength({ min: 8 }).withMessage('Password must be at least 8 characters')
   ]),
@@ -162,7 +161,7 @@ router.post('/login',
     // 3. Generate JWT token
     const token = generateToken({ userId: user.id });
 
-    // 4. Return success response
+    // 4. Return success response with consistent structure
     apiResponse(res, 200, {
       success: true,
       token: token,
@@ -171,7 +170,7 @@ router.post('/login',
         name: user.name,
         phoneNumber: user.phone_number
       }
-    }, 'Login successful');
+    });
   })
 );
 
