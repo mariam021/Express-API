@@ -37,7 +37,13 @@ router.post('/signup',
     body('password').isLength({ min: 8 }).withMessage('Password must be at least 8 characters'),
     body('age').optional().isInt({ min: 1 }).withMessage('Age must be a positive integer'),
     body('mac').optional().isMACAddress().withMessage('Invalid MAC address format'),
-    body('phone_number').isMobilePhone().withMessage('Invalid phone number'),
+    body('phone_number')
+      .trim()
+      .notEmpty()
+      .withMessage('Phone number is required')
+      .customSanitizer(value => value.replace(/[^\d+]/g, ''))
+      .isLength({ min: 8, max: 15 })
+      .withMessage('Phone number must be between 8-15 digits'),
     body('image').optional().isURL().withMessage('Invalid image URL')
   ]),
   asyncHandler(async (req, res) => {
@@ -123,8 +129,16 @@ router.get('/all',
 // User Login
 router.post('/login',
   validateRequest([
-    body('phone_number').isMobilePhone().withMessage('Invalid phone number'),
-    body('password').isLength({ min: 8 }).withMessage('Password must be at least 8 characters')
+    body('phone_number')
+      .trim()
+      .notEmpty()
+      .withMessage('Phone number is required')
+      .customSanitizer(value => value.replace(/[^\d+]/g, ''))
+      .isLength({ min: 8, max: 15 })
+      .withMessage('Phone number must be between 8-15 digits'),
+    body('password')
+      .isLength({ min: 8 })
+      .withMessage('Password must be at least 8 characters')
   ]),
   asyncHandler(async (req, res) => {
     const { phone_number, password } = req.body;
