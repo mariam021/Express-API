@@ -2,18 +2,24 @@
 import express from 'express';
 import { body, param } from 'express-validator';
 import bcrypt from 'bcryptjs';
+import jwt from 'jsonwebtoken';
 import db from '../libs/db.js';
 import { apiResponse, asyncHandler, authenticate } from '../libs/utils.js';
 import { validateRequest } from '../middleware/validator.js';
 
 const router = express.Router();
 
+// Token generation function
+function generateToken(payload) {
+  return jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: '1h' });
+}
+
 // List all API endpoints
 router.get('/', (req, res) => {
   res.json({
     message: "Users API Endpoints",
     endpoints: {
-      create_user: "POST /",
+      create_user: "POST /signup",
       get_all_users: "GET /all",
       get_current_user: "GET /me (requires auth)",
       get_user_by_id: "GET /:id",
@@ -24,7 +30,7 @@ router.get('/', (req, res) => {
   });
 });
 
-// Create new user
+// Create new user with auto-login
 router.post('/signup',
   validateRequest([
     body('name').trim().notEmpty().withMessage('Name is required'),
@@ -59,7 +65,23 @@ router.post('/signup',
       [name, hashedPassword, age, mac, phone_number, image]
     );
 
-    apiResponse(res, 201, result.rows[0], 'User created successfully');
+    const user = result.rows[0];
+    
+    // Generate token for auto-login
+    const token = generateToken({ userId: user.id });
+    
+    // Return user data with token
+    apiResponse(res, 201, {
+      token,
+      user: {
+        id: user.id,
+        name: user.name,
+        phoneNumber: user.phoneNumber,
+        age: user.age,
+        mac: user.mac,
+        image: user.image
+      }
+    }, 'User created and logged in successfully');
   })
 );
 
@@ -102,7 +124,7 @@ router.get('/all',
 router.post('/login',
   validateRequest([
     body('phone_number').isMobilePhone().withMessage('Invalid phone number'),
-    body('password').isLength({ min: 6 }).withMessage('Password must be at least 6 characters')
+    body('password').isLength({ min: 8 }).withMessage('Password must be at least 8 characters')
   ]),
   asyncHandler(async (req, res) => {
     const { phone_number, password } = req.body;
@@ -125,8 +147,8 @@ router.post('/login',
       return apiResponse(res, 401, null, 'Invalid credentials');
     }
 
-    // 3. Generate JWT token (assuming you have a function for this)
-    const token = generateToken({ userId: user.id }); // Replace with your token generation logic
+    // 3. Generate JWT token
+    const token = generateToken({ userId: user.id });
 
     // 4. Return token + user data (excluding password)
     apiResponse(res, 200, {
@@ -186,7 +208,7 @@ router.put('/:id',
   validateRequest([
     param('id').isInt().toInt(),
     body('name').optional().trim().notEmpty(),
-    body('password').optional().isLength({ min: 6 }),
+    body('password').optional().isLength({ min: 8 }),
     body('age').optional().isInt({ min: 1 }),
     body('mac').optional().isMACAddress(),
     body('phone_number').optional().isMobilePhone(),
