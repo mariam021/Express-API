@@ -127,25 +127,23 @@ router.get('/all',
 );
 
 // User Login
+// routes/users.js - Updated Login Endpoint
 router.post('/login',
   validateRequest([
     body('phone_number')
       .trim()
-      .notEmpty()
-      .withMessage('Phone number is required')
-      .customSanitizer(value => value.replace(/[^\d+]/g, ''))
-      .isLength({ min: 11 })
-      .withMessage('Phone number must be 11 digits'),
+      .notEmpty().withMessage('Phone number is required')
+      .customSanitizer(value => value.replace(/[^\d+]/g, '')) // Remove non-digit characters
+      .isLength({ min: 8, max: 15 }).withMessage('Phone number must be 8-15 digits'),
     body('password')
-      .isLength({ min: 8 })
-      .withMessage('Password must be at least 8 characters')
+      .isLength({ min: 8 }).withMessage('Password must be at least 8 characters')
   ]),
   asyncHandler(async (req, res) => {
     const { phone_number, password } = req.body;
 
     // 1. Find user by phone number
     const userResult = await db.query(
-      `SELECT id, name, password FROM users WHERE phone_number = $1`,
+      `SELECT id, name, password, phone_number FROM users WHERE phone_number = $1`,
       [phone_number]
     );
 
@@ -164,15 +162,16 @@ router.post('/login',
     // 3. Generate JWT token
     const token = generateToken({ userId: user.id });
 
-    // 4. Return token + user data (excluding password)
+    // 4. Return success response
     apiResponse(res, 200, {
-      token,
+      success: true,
+      token: token,
       user: {
         id: user.id,
         name: user.name,
-        phoneNumber: phone_number
+        phoneNumber: user.phone_number
       }
-    });
+    }, 'Login successful');
   })
 );
 
