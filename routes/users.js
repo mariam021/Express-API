@@ -134,10 +134,10 @@ router.post('/login',
       .notEmpty()
       .withMessage('Phone number is required')
       .customSanitizer(value => value.replace(/[^\d+]/g, ''))
-      .isLength({ min: 8, max: 15 })
-      .withMessage('Phone number must be between 8-15 digits'),
+      .isLength({ min: 11 })
+      .withMessage('Phone number must be 11 digits'),
     body('password')
-      .isLength({ min: 8 })
+      .isLength(11)
       .withMessage('Password must be at least 8 characters')
   ]),
   asyncHandler(async (req, res) => {
