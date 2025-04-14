@@ -129,24 +129,21 @@ router.get('/all',
 // User Login
 router.post('/login',
   validateRequest([
-    body('phone_number')
+    body('username') // Changed from phone_number to username
       .trim()
       .notEmpty()
-      .withMessage('Phone number is required')
-      .customSanitizer(value => value.replace(/[^\d+]/g, ''))
-      .isLength({ min: 11 })
-      .withMessage('Phone number must be 11 digits'),
+      .withMessage('Username is required'),
     body('password')
       .isLength({ min: 8 })
       .withMessage('Password must be at least 8 characters')
   ]),
   asyncHandler(async (req, res) => {
-    const { phone_number, password } = req.body;
+    const { username, password } = req.body;
 
-    // 1. Find user by phone number
+    // 1. Find user by username
     const userResult = await db.query(
-      `SELECT id, name, password FROM users WHERE phone_number = $1`,
-      [phone_number]
+      `SELECT id, name, password FROM users WHERE name = $1`,
+      [username]
     );
 
     if (userResult.rows.length === 0) {
@@ -164,13 +161,13 @@ router.post('/login',
     // 3. Generate JWT token
     const token = generateToken({ userId: user.id });
 
-    // 4. Return token + user data (excluding password)
+    // 4. Return properly formatted response
     apiResponse(res, 200, {
-      token,
+      success: true,
+      token: token,
       user: {
         id: user.id,
-        name: user.name,
-        phoneNumber: phone_number
+        name: user.name
       }
     });
   })
