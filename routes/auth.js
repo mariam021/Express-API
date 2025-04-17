@@ -3,6 +3,7 @@ import express from 'express';
 import { body } from 'express-validator';
 import bcrypt from 'bcryptjs';
 import db from '../libs/db.js';
+import { authenticate } from '../libs/utils.js';
 import { apiResponse, asyncHandler, generateToken } from '../libs/utils.js';
 import { validateRequest } from '../middleware/validator.js';
 
