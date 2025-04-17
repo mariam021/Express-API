@@ -11,7 +11,7 @@ const router = express.Router();
 // Login route
 router.post('/login', 
   validateRequest([
-    body('username').trim().notEmpty().withMessage('Username is required'),
+    body('phone_number').trim().notEmpty().withMessage('Phone number is required'),
     body('password').notEmpty().withMessage('Password is required')
   ]),
   asyncHandler(async (req, res) => {
@@ -55,14 +55,11 @@ router.post('/login',
 );
 
 // Register route
-router.post('/register', 
+router.post('/register',
   validateRequest([
     body('name').trim().notEmpty().withMessage('Name is required'),
     body('password').isLength({ min: 6 }).withMessage('Password must be at least 6 characters'),
-    body('age').optional().isInt({ min: 1 }).withMessage('Valid age is required'),
-    body('mac').optional().isMACAddress().withMessage('Valid MAC address is required'),
-    body('phone_number').optional().isMobilePhone().withMessage('Valid phone number is required'),
-    body('image').optional().isURL().withMessage('Image must be a valid URL')
+    body('phone_number').isMobilePhone().withMessage('Valid phone number is required')
   ]),
   asyncHandler(async (req, res) => {
     const { name, password, age, mac, phone_number, image } = req.body;
