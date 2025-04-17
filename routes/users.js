@@ -78,16 +78,20 @@ router.post('/signup',
     
     // Return user data with token
     apiResponse(res, 201, {
-      token,
-      user: {
-        id: user.id,
-        name: user.name,
-        phoneNumber: user.phoneNumber,
-        age: user.age,
-        mac: user.mac,
-        image: user.image
-      }
-    }, 'User created and logged in successfully');
+      success: true,
+      data: { // Consistent structure with login
+        token: token,
+        user: {
+          id: user.id,
+          name: user.name,
+          phoneNumber: user.phoneNumber,
+          age: user.age,
+          mac: user.mac,
+          image: user.image
+        }
+      },
+      expiry: 60 * 60 * 24 * 7 // 7 days in seconds
+    });
   })
 );
 

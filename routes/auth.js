@@ -40,14 +40,16 @@ router.post('/login',
     
     // Return user data and token
     apiResponse(res, 200, {
-      user: {
-        id: user.id,
-        name: user.name,
-        age: user.age,
-        phone_number: user.phone_number,
-        image: user.image
+      success: true,
+      data: { // Wrap in data object to match your client expectations
+        token: token,
+        user: {
+          id: user.id,
+          name: user.name,
+          phoneNumber: user.phone_number
+        }
       },
-      token
+      expiry: 60 * 60 * 24 * 7 // 7 days in seconds
     });
   })
 );
@@ -93,6 +95,22 @@ router.post('/register',
     const token = generateToken({ userId: user.id });
     
     apiResponse(res, 201, { user, token }, 'User registered successfully');
+  })
+);
+
+router.post('/refresh', 
+  authenticate,
+  asyncHandler(async (req, res) => {
+    // Generate new token with same user ID
+    const token = generateToken({ userId: req.user.userId });
+    
+    apiResponse(res, 200, {
+      success: true,
+      data: {
+        token: token
+      },
+      expiry: 60 * 60 * 24 * 7 // 7 days in seconds
+    });
   })
 );
 

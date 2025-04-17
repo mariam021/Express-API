@@ -47,13 +47,19 @@ export const authenticate = (req, res, next) => {
   try {
     const token = req.header('Authorization')?.replace('Bearer ', '');
     
-    if (!token) throw new Error('Authentication required');
+    if (!token) {
+      return apiResponse(res, 401, null, 'Authentication required');
+    }
     
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    req.user = { userId: decoded.userId }; // Ensure this matches your token payload
+    req.user = { userId: decoded.userId };
     next();
   } catch (err) {
-    apiResponse(res, 401, null, err.message);
+    // More specific error messages
+    const message = err.name === 'TokenExpiredError' 
+      ? 'Token expired' 
+      : 'Invalid token';
+    return apiResponse(res, 401, null, message);
   }
 };
 
@@ -64,7 +70,7 @@ export const generateToken = (payload, expiresIn = '24h') => {
 };*/
 export const generateToken = (payload) => {
   return jwt.sign(payload, process.env.JWT_SECRET, { 
-    expiresIn: '24h' 
+    expiresIn: '7d'
   });
 };
 // Sanitize phone number format
