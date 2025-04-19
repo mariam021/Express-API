@@ -33,64 +33,49 @@ router.get('/', (req, res) => {
 // Create new user with auto-login
 router.post('/signup',
   validateRequest([
-    body('name').trim().notEmpty().withMessage('Name is required'),
-    body('password').isLength({ min: 8 }).withMessage('Password must be at least 8 characters'),
-    body('age').optional().isInt({ min: 1 }).withMessage('Age must be a positive integer'),
-    body('mac').optional().isMACAddress().withMessage('Invalid MAC address format'),
-    body('phone_number')
-      .trim()
-      .notEmpty()
-      .withMessage('Phone number is required')
-      .customSanitizer(value => value.replace(/[^\d+]/g, ''))
-      .isLength({ min: 8, max: 15 })
-      .withMessage('Phone number must be between 8-15 digits'),
-    body('image').optional().isURL().withMessage('Invalid image URL')
+    body('name').trim().notEmpty(),
+    body('password').isLength({ min: 6 }),
+    body('phone_number').isMobilePhone()
   ]),
   asyncHandler(async (req, res) => {
-    const { name, password, age, mac, phone_number, image } = req.body;
+    const { name, password, phone_number } = req.body;
 
-    // Check if user already exists (by phone number)
-    const existingUser = await db.query(
+    // 1. Check if user exists
+    const exists = await db.query(
       'SELECT id FROM users WHERE phone_number = $1',
       [phone_number]
     );
 
-    if (existingUser.rows.length > 0) {
-      return apiResponse(res, 409, null, 'User with this phone number already exists');
+    if (exists.rows.length > 0) {
+      return apiResponse(res, 409, null, 'User already exists');
     }
 
-    // Hash password
+    // 2. Hash password
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    // Insert new user
-    const result = await db.query(
-      `INSERT INTO users 
-       (name, password, age, mac, phone_number, image) 
-       VALUES ($1, $2, $3, $4, $5, $6) 
-       RETURNING id, name, age, mac, phone_number as "phoneNumber", image`,
-      [name, hashedPassword, age, mac, phone_number, image]
+    // 3. Create user
+    const newUser = await db.query(
+      `INSERT INTO users (name, password, phone_number)
+       VALUES ($1, $2, $3)
+       RETURNING id, name, phone_number`,
+      [name, hashedPassword, phone_number]
     );
 
-    const user = result.rows[0];
-    
-    // Generate token for auto-login
-    const token = generateToken({ userId: user.id });
-    
-    // Return user data with token
+    // 4. Generate token
+    const token = generateToken({ userId: newUser.rows[0].id });
+
+    // 5. Return PROPER STRUCTURE
     apiResponse(res, 201, {
       success: true,
-      data: { // Consistent structure with login
+      data: {
         token: token,
         user: {
-          id: user.id,
-          name: user.name,
-          phoneNumber: user.phoneNumber,
-          age: user.age,
-          mac: user.mac,
-          image: user.image
+          id: newUser.rows[0].id,
+          name: newUser.rows[0].name,
+          phoneNumber: newUser.rows[0].phone_number
         }
       },
-      expiry: 60 * 60 * 24 * 7 // 7 days in seconds
+      expiry: 604800 // 7 days in seconds
     });
   })
 );
@@ -131,49 +116,46 @@ router.get('/all',
 );
 
 // User Login
-router.post('/login',
+router.post('/login', 
   validateRequest([
-    body('phone_number')
-      .trim()
-      .notEmpty().withMessage('Phone number is required')
-      .customSanitizer(value => value.replace(/[^\d+]/g, ''))
-      .isLength({ min: 11, max: 11 }).withMessage('Phone number must be exactly 11 digits'),
-    body('password')
-      .isLength({ min: 8 }).withMessage('Password must be at least 8 characters')
+    body('phone_number').trim().notEmpty(),
+    body('password').notEmpty()
   ]),
   asyncHandler(async (req, res) => {
     const { phone_number, password } = req.body;
 
-    // 1. Find user by phone number
-    const userResult = await db.query(
-      `SELECT id, name, password, phone_number FROM users WHERE phone_number = $1`,
+    // 1. Find user
+    const user = await db.query(
+      `SELECT id, name, password FROM users 
+       WHERE phone_number = $1`, 
       [phone_number]
     );
 
-    if (userResult.rows.length === 0) {
+    if (user.rows.length === 0) {
       return apiResponse(res, 401, null, 'Invalid credentials');
     }
-
-    const user = userResult.rows[0];
 
     // 2. Verify password
-    const isPasswordValid = await bcrypt.compare(password, user.password);
-    if (!isPasswordValid) {
+    const isValid = await bcrypt.compare(password, user.rows[0].password);
+    if (!isValid) {
       return apiResponse(res, 401, null, 'Invalid credentials');
     }
 
-    // 3. Generate JWT token
-    const token = generateToken({ userId: user.id });
+    // 3. Generate token
+    const token = generateToken({ userId: user.rows[0].id });
 
-    // 4. Return success response with consistent structure
+    // 4. Return PROPER STRUCTURE
     apiResponse(res, 200, {
       success: true,
-      token: token,
-      user: {
-        id: user.id,
-        name: user.name,
-        phoneNumber: user.phone_number
-      }
+      data: {
+        token: token,
+        user: {
+          id: user.rows[0].id,
+          name: user.rows[0].name,
+          phoneNumber: phone_number
+        }
+      },
+      expiry: 604800 // 7 days in seconds
     });
   })
 );
