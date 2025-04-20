@@ -50,7 +50,6 @@ router.post('/login',
           phoneNumber: user.phone_number
         }
       },
-      expiry: 60 * 60 * 24 * 7 // 7 days in seconds
     });
   })
 );
@@ -107,7 +106,6 @@ router.post('/refresh',
       data: {
         token: token
       },
-      expiry: 60 * 60 * 24 * 7 // 7 days in seconds
     });
   })
 );

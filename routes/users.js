@@ -75,7 +75,6 @@ router.post('/signup',
           phoneNumber: newUser.rows[0].phone_number
         }
       },
-      expiry: 604800 // 7 days in seconds
     });
   })
 );
@@ -155,7 +154,6 @@ router.post('/login',
           phoneNumber: phone_number
         }
       },
-      expiry: 604800 // 7 days in seconds
     });
   })
 );

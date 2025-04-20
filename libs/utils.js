@@ -70,7 +70,7 @@ export const generateToken = (payload, expiresIn = '24h') => {
 };*/
 export const generateToken = (payload) => {
   return jwt.sign(payload, process.env.JWT_SECRET, { 
-    expiresIn: '7d'
+    
   });
 };
 // Sanitize phone number format
