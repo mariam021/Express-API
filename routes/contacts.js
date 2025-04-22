@@ -35,8 +35,6 @@ router.get('/users/:user_id',
         c.is_emergency,
         c.relationship,
         c.image,
-        c.created_at,
-        c.updated_at,
         COUNT(p.id) as phone_count
        FROM contacts c
        LEFT JOIN contact_phone_numbers p ON c.id = p.contact_id
@@ -63,7 +61,7 @@ router.get('/users/:user_id',
       const phonesResult = await db.query(
         `SELECT * FROM contact_phone_numbers
          WHERE contact_id = ANY($1)
-         ORDER BY is_primary DESC, phone_type ASC`,
+         ORDER BY contact_id ASC`,
         [contactIds]
       );
       phones = phonesResult.rows;
@@ -114,7 +112,7 @@ router.get('/:id',
     const phones = await db.query(
       `SELECT * FROM contact_phone_numbers 
        WHERE contact_id = $1
-       ORDER BY is_primary DESC, phone_type ASC`,
+       ORDER BY contact_id ASC`,
       [id]
     );
     
@@ -155,14 +153,12 @@ router.post('/',
       if (phone_numbers.length > 0) {
         const phoneValues = phone_numbers.map(phone => [
           contact.id,
-          phone.phone_number,
-          phone.phone_type || 'mobile',
-          phone.is_primary || false
+          phone.phone_number
         ]);
         
         await client.query(
           `INSERT INTO contact_phone_numbers
-           (contact_id, phone_number, phone_type, is_primary)
+           (contact_id, phone_number)
            VALUES ${phoneValues.map((_, i) => 
              `($${i*4+1}, $${i*4+2}, $${i*4+3}, $${i*4+4})`
            ).join(',')}`,
@@ -174,7 +170,7 @@ router.post('/',
       const phones = await client.query(
         `SELECT * FROM contact_phone_numbers 
          WHERE contact_id = $1
-         ORDER BY is_primary DESC, phone_type ASC`,
+         ORDER BY contact_id ASC`,
         [contact.id]
       );
       
@@ -243,14 +239,12 @@ router.put('/:id',
         if (phone_numbers.length > 0) {
           const phoneValues = phone_numbers.map(phone => [
             id,
-            phone.phone_number,
-            phone.phone_type || 'mobile',
-            phone.is_primary || false
+            phone.phone_number
           ]);
           
           await client.query(
             `INSERT INTO contact_phone_numbers
-             (contact_id, phone_number, phone_type, is_primary)
+             (contact_id, phone_number)
              VALUES ${phoneValues.map((_, i) => 
                `($${i*4+1}, $${i*4+2}, $${i*4+3}, $${i*4+4})`
              ).join(',')}`,
@@ -263,7 +257,7 @@ router.put('/:id',
       const phones = await client.query(
         `SELECT * FROM contact_phone_numbers 
          WHERE contact_id = $1
-         ORDER BY is_primary DESC, phone_type ASC`,
+         ORDER contact_id ASC`,
         [id]
       );
       
