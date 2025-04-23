@@ -35,7 +35,7 @@ router.get('/contact/:contactId',
     const result = await db.query(
       `SELECT * FROM contact_phone_numbers
        WHERE contact_id = $1
-       ORDER BY is_primary DESC, phone_type ASC`,
+       ORDER BY phone_type ASC`,
       [contactId]
     );
     
@@ -81,11 +81,10 @@ router.post('/',
   validateRequest([
     body('contact_id').isInt().toInt(),
     body('phone_number').trim().notEmpty(),
-    body('phone_type').optional().isIn(['mobile', 'home', 'work']),
-    body('is_primary').optional().isBoolean()
+    body('phone_type').optional().isIn(['mobile', 'home', 'work'])
   ]),
   asyncHandler(async (req, res) => {
-    const { contact_id, phone_number, phone_type = 'mobile', is_primary = false } = req.body;
+    const { contact_id, phone_number, phone_type = 'mobile' } = req.body;
     
     // Check if contact belongs to user
     const contactCheck = await db.query(
@@ -102,23 +101,14 @@ router.post('/',
     }
     
     await db.transaction(async (client) => {
-      // If setting as primary, first unset any existing primary
-      if (is_primary) {
-        await client.query(
-          `UPDATE contact_phone_numbers
-           SET is_primary = false
-           WHERE contact_id = $1`,
-          [contact_id]
-        );
-      }
       
       // Insert new phone number
       const result = await client.query(
         `INSERT INTO contact_phone_numbers
-         (contact_id, phone_number, phone_type, is_primary)
+         (contact_id, phone_number, phone_type)
          VALUES ($1, $2, $3, $4)
          RETURNING *`,
-        [contact_id, phone_number, phone_type, is_primary]
+        [contact_id, phone_number, phone_type]
       );
       
       apiResponse(res, 201, result.rows[0], 'Phone number added successfully');
@@ -131,12 +121,11 @@ router.put('/:id',
   validateRequest([
     param('id').isInt().toInt(),
     body('phone_number').optional().trim().notEmpty(),
-    body('phone_type').optional().isIn(['mobile', 'home', 'work']),
-    body('is_primary').optional().isBoolean()
+    body('phone_type').optional().isIn(['mobile', 'home', 'work'])
   ]),
   asyncHandler(async (req, res) => {
     const { id } = req.params;
-    const { phone_number, phone_type, is_primary } = req.body;
+    const { phone_number, phone_type } = req.body;
     
     // Check if phone number exists and belongs to user's contact
     const phoneCheck = await db.query(
@@ -155,25 +144,15 @@ router.put('/:id',
     }
     
     await db.transaction(async (client) => {
-      // If setting as primary, first unset any existing primary
-      if (is_primary === true) {
-        await client.query(
-          `UPDATE contact_phone_numbers
-           SET is_primary = false
-           WHERE contact_id = $1 AND id != $2`,
-          [phoneCheck.rows[0].contact_id, id]
-        );
-      }
       
       // Update phone number
       const result = await client.query(
         `UPDATE contact_phone_numbers SET
           phone_number = COALESCE($1, phone_number),
-          phone_type = COALESCE($2, phone_type),
-          is_primary = COALESCE($3, is_primary)
+          phone_type = COALESCE($2, phone_type)
          WHERE id = $4
          RETURNING *`,
-        [phone_number, phone_type, is_primary, id]
+        [phone_number, phone_type, id]
       );
       
       apiResponse(res, 200, result.rows[0], 'Phone number updated successfully');
