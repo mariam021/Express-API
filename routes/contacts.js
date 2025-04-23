@@ -160,7 +160,7 @@ router.post('/',
           `INSERT INTO contact_phone_numbers
            (contact_id, phone_number)
            VALUES ${phoneValues.map((_, i) => 
-             `($${i*4+1}, $${i*4+2}, $${i*4+3}, $${i*4+4})`
+             `($${i*2+1}, $${i*2+2})`  // Only 2 parameters per row
            ).join(',')}`,
           phoneValues.flat()
         );
@@ -246,7 +246,7 @@ router.put('/:id',
             `INSERT INTO contact_phone_numbers
              (contact_id, phone_number)
              VALUES ${phoneValues.map((_, i) => 
-               `($${i*4+1}, $${i*4+2}, $${i*4+3}, $${i*4+4})`
+               `($${i*2+1}, $${i*2+2})`  // Only 2 parameters per row
              ).join(',')}`,
             phoneValues.flat()
           );
