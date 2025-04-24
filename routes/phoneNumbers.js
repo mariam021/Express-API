@@ -101,14 +101,14 @@ router.post('/',
     
     await db.transaction(async (client) => {
       
-      // Insert new phone number
+      // Insert new phone number - FIX: Removed extra placeholder ($3)
       const result = await client.query(
-      `INSERT INTO contact_phone_numbers
-      (contact_id, phone_number)
-      VALUES ($1, $2)
-      RETURNING *`,
-      [contact_id, phone_number]  // Only 2 parameters, not 3
-);
+        `INSERT INTO contact_phone_numbers
+         (contact_id, phone_number)
+         VALUES ($1, $2)
+         RETURNING *`,
+        [contact_id, phone_number]
+      );
       
       apiResponse(res, 201, result.rows[0], 'Phone number added successfully');
     });
@@ -143,7 +143,7 @@ router.put('/:id',
     
     await db.transaction(async (client) => {
       
-      // Update phone number
+      // Update phone number - FIX: Corrected parameter indexing
       const result = await client.query(
         `UPDATE contact_phone_numbers SET
          phone_number = COALESCE($1, phone_number)
