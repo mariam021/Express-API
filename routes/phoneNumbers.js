@@ -103,12 +103,12 @@ router.post('/',
       
       // Insert new phone number
       const result = await client.query(
-        `INSERT INTO contact_phone_numbers
-         (contact_id, phone_number)
-         VALUES ($1, $2, $3)
-         RETURNING *`,
-        [contact_id, phone_number]
-      );
+      `INSERT INTO contact_phone_numbers
+      (contact_id, phone_number)
+      VALUES ($1, $2)
+      RETURNING *`,
+      [contact_id, phone_number]  // Only 2 parameters, not 3
+);
       
       apiResponse(res, 201, result.rows[0], 'Phone number added successfully');
     });
@@ -147,7 +147,7 @@ router.put('/:id',
       const result = await client.query(
         `UPDATE contact_phone_numbers SET
          phone_number = COALESCE($1, phone_number)
-         WHERE id = $3
+         WHERE id = $2
          RETURNING *`,
         [phone_number, id]
       );

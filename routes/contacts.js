@@ -129,7 +129,7 @@ router.post('/',
     body('name').trim().notEmpty().withMessage('Name is required'),
     body('is_emergency').optional().isBoolean(),
     body('relationship').optional().trim(),
-    body('relationship').optional().trim(),
+    body('image').optional().trim(),
     body('phone_numbers').optional().isArray()
   ]),
   asyncHandler(async (req, res) => {
@@ -257,7 +257,7 @@ router.put('/:id',
       const phones = await client.query(
         `SELECT * FROM contact_phone_numbers 
          WHERE contact_id = $1
-         ORDER contact_id ASC`,
+         ORDER BY contact_id ASC`,
         [id]
       );
       
