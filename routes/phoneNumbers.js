@@ -35,7 +35,7 @@ router.get('/contact/:contactId',
     const result = await db.query(
       `SELECT * FROM contact_phone_numbers
        WHERE contact_id = $1
-       ORDER BY phone_type ASC`,
+       ORDER BY contact_id ASC`,
       [contactId]
     );
     
@@ -80,11 +80,10 @@ router.get('/:id',
 router.post('/',
   validateRequest([
     body('contact_id').isInt().toInt(),
-    body('phone_number').trim().notEmpty(),
-    body('phone_type').optional().isIn(['mobile', 'home', 'work'])
+    body('phone_number').trim().notEmpty()
   ]),
   asyncHandler(async (req, res) => {
-    const { contact_id, phone_number, phone_type = 'mobile' } = req.body;
+    const { contact_id, phone_number } = req.body;
     
     // Check if contact belongs to user
     const contactCheck = await db.query(
@@ -105,10 +104,10 @@ router.post('/',
       // Insert new phone number
       const result = await client.query(
         `INSERT INTO contact_phone_numbers
-         (contact_id, phone_number, phone_type)
-         VALUES ($1, $2, $3, $4)
+         (contact_id, phone_number)
+         VALUES ($1, $2, $3)
          RETURNING *`,
-        [contact_id, phone_number, phone_type]
+        [contact_id, phone_number]
       );
       
       apiResponse(res, 201, result.rows[0], 'Phone number added successfully');
@@ -120,12 +119,11 @@ router.post('/',
 router.put('/:id',
   validateRequest([
     param('id').isInt().toInt(),
-    body('phone_number').optional().trim().notEmpty(),
-    body('phone_type').optional().isIn(['mobile', 'home', 'work'])
+    body('phone_number').optional().trim().notEmpty()
   ]),
   asyncHandler(async (req, res) => {
     const { id } = req.params;
-    const { phone_number, phone_type } = req.body;
+    const { phone_number } = req.body;
     
     // Check if phone number exists and belongs to user's contact
     const phoneCheck = await db.query(
@@ -148,11 +146,10 @@ router.put('/:id',
       // Update phone number
       const result = await client.query(
         `UPDATE contact_phone_numbers SET
-          phone_number = COALESCE($1, phone_number),
-          phone_type = COALESCE($2, phone_type)
-         WHERE id = $4
+         phone_number = COALESCE($1, phone_number)
+         WHERE id = $3
          RETURNING *`,
-        [phone_number, phone_type, id]
+        [phone_number, id]
       );
       
       apiResponse(res, 200, result.rows[0], 'Phone number updated successfully');

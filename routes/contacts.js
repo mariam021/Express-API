@@ -129,7 +129,7 @@ router.post('/',
     body('name').trim().notEmpty().withMessage('Name is required'),
     body('is_emergency').optional().isBoolean(),
     body('relationship').optional().trim(),
-    body('image').optional().trim(),
+    body('relationship').optional().trim(),
     body('phone_numbers').optional().isArray()
   ]),
   asyncHandler(async (req, res) => {
