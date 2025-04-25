@@ -19,15 +19,19 @@ router.get('/users/:user_id/',
   asyncHandler(async (req, res) => {
     const user_id = req.params.user_id;
     
+    // Authorization check
     if (parseInt(user_id) !== req.user.userId) {
-      return apiResponse(res, 403, null, 'Not authorized to access these contacts');
+      return res.status(403).json({
+        success: false,
+        message: 'Not authorized to access these contacts'
+      });
     }
     
     const { limit, offset } = req.pagination;
     
     // Get contacts with their phone numbers in a single query
-    const contactsResult = await db.query(
-      `SELECT 
+    const contactsResult = await db.query(`
+      SELECT 
         c.id,
         c.user_id as "userId",
         c.name,
@@ -36,11 +40,11 @@ router.get('/users/:user_id/',
         c.image,
         p.id as "phoneId",
         p.phone_number as "phoneNumber"
-       FROM contacts c
-       LEFT JOIN contact_phone_numbers p ON c.id = p.contact_id
-       WHERE c.user_id = $1
-       ORDER BY c.is_emergency DESC, c.name ASC
-       LIMIT $2 OFFSET $3`,
+      FROM contacts c
+      LEFT JOIN contact_phone_numbers p ON c.id = p.contact_id
+      WHERE c.user_id = $1
+      ORDER BY c.is_emergency DESC, c.name ASC
+      LIMIT $2 OFFSET $3`,
       [user_id, limit, offset]
     );
     
@@ -70,7 +74,7 @@ router.get('/users/:user_id/',
     
     const contactsWithPhones = Array.from(contactsMap.values());
     
-    // Get total count
+    // Get total count for pagination
     const countResult = await db.query(
       'SELECT COUNT(*) FROM contacts WHERE user_id = $1',
       [user_id]
@@ -79,7 +83,13 @@ router.get('/users/:user_id/',
     res.status(200).json({
       success: true,
       message: 'Contacts retrieved successfully',
-      data: contactsWithPhones
+      data: contactsWithPhones,
+      pagination: {
+        total: parseInt(countResult.rows[0].count),
+        page: Math.ceil(offset / limit) + 1,
+        limit: limit,
+        pages: Math.ceil(parseInt(countResult.rows[0].count) / limit)
+      }
     });
   })
 );
