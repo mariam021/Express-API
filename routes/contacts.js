@@ -11,14 +11,15 @@ const router = express.Router();
 router.use(authenticate);
 
 // Get all contacts for a user
-router.get('/users/:user_id',
+// Get all contacts for a user
+router.get('/users/:user_id/contacts',
   paginate,
   validateRequest([
     param('user_id').isInt().toInt()
   ]),
   asyncHandler(async (req, res) => {
-    // Get user_id from query or from authenticated user
-    const user_id = req.query.user_id || req.user.userId;
+    // Get user_id from params
+    const user_id = req.params.user_id;
     
     // Ensure user can only access their own contacts
     if (parseInt(user_id) !== req.user.userId) {
@@ -31,8 +32,9 @@ router.get('/users/:user_id',
     const contacts = await db.query(
       `SELECT 
         c.id,
+        c.user_id,
         c.name,
-        c.is_emergency,
+        c.is_emergency as "isEmergency",
         c.relationship,
         c.image,
         COUNT(p.id) as phone_count
@@ -59,7 +61,11 @@ router.get('/users/:user_id',
     
     if (contactIds.length > 0) {
       const phonesResult = await db.query(
-        `SELECT * FROM contact_phone_numbers
+        `SELECT 
+          id,
+          contact_id as "contactId",
+          phone_number as "phoneNumber"
+         FROM contact_phone_numbers
          WHERE contact_id = ANY($1)
          ORDER BY contact_id ASC`,
         [contactIds]
@@ -70,19 +76,24 @@ router.get('/users/:user_id',
     // Combine contacts with their phone numbers
     const contactsWithPhones = contacts.rows.map(contact => {
       return {
-        ...contact,
-        phone_numbers: phones.filter(p => p.contact_id === contact.id)
+        id: contact.id,
+        userId: contact.user_id,
+        name: contact.name,
+        isEmergency: contact.isEmergency,
+        relationship: contact.relationship,
+        image: contact.image,
+        phoneNumbers: phones.filter(p => p.contactId === contact.id).map(p => ({
+          id: p.id,
+          contactId: p.contactId,
+          phoneNumber: p.phoneNumber
+        }))
       };
     });
     
     apiResponse(res, 200, {
-      contacts: contactsWithPhones,
-      pagination: {
-        total: totalCount,
-        page: req.pagination.page,
-        limit: req.pagination.limit,
-        pages: Math.ceil(totalCount / limit)
-      }
+      success: true,
+      message: 'Contacts retrieved successfully',
+      data: contactsWithPhones
     });
   })
 );
