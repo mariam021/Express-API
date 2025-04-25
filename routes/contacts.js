@@ -11,8 +11,8 @@ const router = express.Router();
 router.use(authenticate);
 
 // Get all contacts for a user
-// Get all contacts for a user
-router.get('/users/:user_id/contacts',
+
+router.get('/users/:user_id/',
   paginate,
   validateRequest([
     param('user_id').isInt().toInt()
