@@ -25,8 +25,8 @@ router.get('/users/:user_id/',
     
     const { limit, offset } = req.pagination;
     
-    // Get contacts with pagination
-    const contacts = await db.query(
+    // Get contacts with their phone numbers in a single query
+    const contactsResult = await db.query(
       `SELECT 
         c.id,
         c.user_id as "userId",
@@ -34,91 +34,52 @@ router.get('/users/:user_id/',
         c.is_emergency as "isEmergency",
         c.relationship,
         c.image,
-        COUNT(p.id) as phone_count
+        p.id as "phoneId",
+        p.phone_number as "phoneNumber"
        FROM contacts c
        LEFT JOIN contact_phone_numbers p ON c.id = p.contact_id
        WHERE c.user_id = $1
-       GROUP BY c.id
        ORDER BY c.is_emergency DESC, c.name ASC
        LIMIT $2 OFFSET $3`,
       [user_id, limit, offset]
     );
     
-    // Get phone numbers for all contacts
-    const contactIds = contacts.rows.map(c => c.id);
-    let phones = [];
+    // Group contacts with their phone numbers
+    const contactsMap = new Map();
+    contactsResult.rows.forEach(row => {
+      if (!contactsMap.has(row.id)) {
+        contactsMap.set(row.id, {
+          id: row.id,
+          userId: row.userId,
+          name: row.name,
+          isEmergency: row.isEmergency,
+          relationship: row.relationship,
+          image: row.image,
+          phoneNumbers: []
+        });
+      }
+      
+      if (row.phoneId) {
+        contactsMap.get(row.id).phoneNumbers.push({
+          id: row.phoneId,
+          contactId: row.id,
+          phoneNumber: row.phoneNumber
+        });
+      }
+    });
     
-    if (contactIds.length > 0) {
-      const phonesResult = await db.query(
-        `SELECT 
-          id,
-          contact_id as "contactId",
-          phone_number as "phoneNumber"
-         FROM contact_phone_numbers
-         WHERE contact_id = ANY($1)`,
-        [contactIds]
-      );
-      phones = phonesResult.rows;
-    }
+    const contactsWithPhones = Array.from(contactsMap.values());
     
-    // Format response
-    const contactsWithPhones = contacts.rows.map(contact => ({
-      id: contact.id,
-      userId: contact.userId,
-      name: contact.name,
-      isEmergency: contact.isEmergency,
-      relationship: contact.relationship,
-      image: contact.image,
-      phoneNumbers: phones
-        .filter(p => p.contactId === contact.id)
-        .map(p => ({
-          id: p.id,
-          contactId: p.contactId,
-          phoneNumber: p.phoneNumber
-        }))
-    }));
+    // Get total count
+    const countResult = await db.query(
+      'SELECT COUNT(*) FROM contacts WHERE user_id = $1',
+      [user_id]
+    );
     
-    // Return properly formatted ApiResponse
     res.status(200).json({
       success: true,
       message: 'Contacts retrieved successfully',
       data: contactsWithPhones
-    });
-  })
-);
-
-// Get contact by ID
-router.get('/:id',
-  validateRequest([
-    param('id').isInt().toInt()
-  ]),
-  asyncHandler(async (req, res) => {
-    const { id } = req.params;
-    
-    const contact = await db.query(
-      `SELECT * FROM contacts WHERE id = $1`,
-      [id]
-    );
-    
-    if (contact.rows.length === 0) {
-      return apiResponse(res, 404, null, 'Contact not found');
-    }
-    
-    // Ensure user can only access their own contacts
-    if (contact.rows[0].user_id !== req.user.userId) {
-      return apiResponse(res, 403, null, 'Not authorized to access this contact');
-    }
-    
-    const phones = await db.query(
-      `SELECT * FROM contact_phone_numbers 
-       WHERE contact_id = $1
-       ORDER BY contact_id ASC`,
-      [id]
-    );
-    
-    apiResponse(res, 200, {
-      ...contact.rows[0],
-      phone_numbers: phones.rows
     });
   })
 );
