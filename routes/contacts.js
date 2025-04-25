@@ -11,17 +11,14 @@ const router = express.Router();
 router.use(authenticate);
 
 // Get all contacts for a user
-
 router.get('/users/:user_id/',
   paginate,
   validateRequest([
     param('user_id').isInt().toInt()
   ]),
   asyncHandler(async (req, res) => {
-    // Get user_id from params
     const user_id = req.params.user_id;
     
-    // Ensure user can only access their own contacts
     if (parseInt(user_id) !== req.user.userId) {
       return apiResponse(res, 403, null, 'Not authorized to access these contacts');
     }
@@ -32,7 +29,7 @@ router.get('/users/:user_id/',
     const contacts = await db.query(
       `SELECT 
         c.id,
-        c.user_id,
+        c.user_id as "userId",
         c.name,
         c.is_emergency as "isEmergency",
         c.relationship,
@@ -47,15 +44,7 @@ router.get('/users/:user_id/',
       [user_id, limit, offset]
     );
     
-    // Get total count for pagination
-    const countResult = await db.query(
-      'SELECT COUNT(*) FROM contacts WHERE user_id = $1',
-      [user_id]
-    );
-    
-    const totalCount = parseInt(countResult.rows[0].count);
-    
-    // Get phone numbers for all contacts in a single query
+    // Get phone numbers for all contacts
     const contactIds = contacts.rows.map(c => c.id);
     let phones = [];
     
@@ -66,31 +55,31 @@ router.get('/users/:user_id/',
           contact_id as "contactId",
           phone_number as "phoneNumber"
          FROM contact_phone_numbers
-         WHERE contact_id = ANY($1)
-         ORDER BY contact_id ASC`,
+         WHERE contact_id = ANY($1)`,
         [contactIds]
       );
       phones = phonesResult.rows;
     }
     
-    // Combine contacts with their phone numbers
-    const contactsWithPhones = contacts.rows.map(contact => {
-      return {
-        id: contact.id,
-        userId: contact.user_id,
-        name: contact.name,
-        isEmergency: contact.isEmergency,
-        relationship: contact.relationship,
-        image: contact.image,
-        phoneNumbers: phones.filter(p => p.contactId === contact.id).map(p => ({
+    // Format response
+    const contactsWithPhones = contacts.rows.map(contact => ({
+      id: contact.id,
+      userId: contact.userId,
+      name: contact.name,
+      isEmergency: contact.isEmergency,
+      relationship: contact.relationship,
+      image: contact.image,
+      phoneNumbers: phones
+        .filter(p => p.contactId === contact.id)
+        .map(p => ({
           id: p.id,
           contactId: p.contactId,
           phoneNumber: p.phoneNumber
         }))
-      };
-    });
+    }));
     
-    apiResponse(res, 200, {
+    // Return properly formatted ApiResponse
+    res.status(200).json({
       success: true,
       message: 'Contacts retrieved successfully',
       data: contactsWithPhones
