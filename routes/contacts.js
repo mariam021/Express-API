@@ -1,4 +1,3 @@
-// routes/contacts.js
 import express from 'express';
 import { body, param, query } from 'express-validator';
 import db from '../libs/db.js';
@@ -11,16 +10,16 @@ const router = express.Router();
 router.use(authenticate);
 
 // Get all contacts for a user
-router.get('/users/:user_id/',
+router.get('/users/:userId/',
   paginate,
   validateRequest([
-    param('user_id').isInt().toInt()
+    param('userId').isInt().toInt()
   ]),
   asyncHandler(async (req, res) => {
-    const user_id = req.params.user_id;
+    const userId = req.params.userId;
     
     // Authorization check
-    if (parseInt(user_id) !== req.user.userId) {
+    if (parseInt(userId) !== req.user.userId) {
       return res.status(403).json({
         success: false,
         message: 'Not authorized to access these contacts'
@@ -29,7 +28,7 @@ router.get('/users/:user_id/',
     
     const { limit, offset } = req.pagination;
     
-    // Get contacts with their phone numbers in a single query
+    // Get contacts with their phone numbers
     const contactsResult = await db.query(`
       SELECT 
         c.id,
@@ -45,7 +44,7 @@ router.get('/users/:user_id/',
       WHERE c.user_id = $1
       ORDER BY c.is_emergency DESC, c.name ASC
       LIMIT $2 OFFSET $3`,
-      [user_id, limit, offset]
+      [userId, limit, offset]
     );
     
     // Group contacts with their phone numbers
@@ -59,7 +58,7 @@ router.get('/users/:user_id/',
           isEmergency: row.isEmergency,
           relationship: row.relationship,
           image: row.image,
-          phoneNumbers: []
+          phoneNumbers: [] // Using the correct field name expected by Android
         });
       }
       
@@ -72,18 +71,16 @@ router.get('/users/:user_id/',
       }
     });
     
-    const contactsWithPhones = Array.from(contactsMap.values());
-    
     // Get total count for pagination
     const countResult = await db.query(
       'SELECT COUNT(*) FROM contacts WHERE user_id = $1',
-      [user_id]
+      [userId]
     );
     
     res.status(200).json({
       success: true,
       message: 'Contacts retrieved successfully',
-      data: contactsWithPhones,
+      data: Array.from(contactsMap.values()),
       pagination: {
         total: parseInt(countResult.rows[0].count),
         page: Math.ceil(offset / limit) + 1,
@@ -98,15 +95,14 @@ router.get('/users/:user_id/',
 router.post('/',
   validateRequest([
     body('name').trim().notEmpty().withMessage('Name is required'),
-    body('is_emergency').optional().isBoolean(),
+    body('isEmergency').optional().isBoolean(),
     body('relationship').optional().trim(),
     body('image').optional().trim(),
-    body('phone_numbers').optional().isArray()
+    body('phoneNumbers').optional().isArray()
   ]),
   asyncHandler(async (req, res) => {
-    // Always use the authenticated user's ID
-    const user_id = req.user.userId;
-    const { name, is_emergency = false, relationship, image, phone_numbers = [] } = req.body;
+    const userId = req.user.userId;
+    const { name, isEmergency = false, relationship, image, phoneNumbers = [] } = req.body;
     
     await db.transaction(async (client) => {
       // Insert contact
@@ -115,39 +111,42 @@ router.post('/',
          (user_id, name, is_emergency, relationship, image)
          VALUES ($1, $2, $3, $4, $5)
          RETURNING *`,
-        [user_id, name, is_emergency, relationship, image]
+        [userId, name, isEmergency, relationship, image]
       );
       
       const contact = contactResult.rows[0];
       
       // Insert phone numbers if provided
-      if (phone_numbers.length > 0) {
-        const phoneValues = phone_numbers.map(phone => [
+      if (phoneNumbers.length > 0) {
+        const phoneValues = phoneNumbers.map(phone => [
           contact.id,
-          phone.phone_number
+          phone.phoneNumber
         ]);
         
         await client.query(
           `INSERT INTO contact_phone_numbers
            (contact_id, phone_number)
-           VALUES ${phoneValues.map((_, i) => 
-             `($${i*2+1}, $${i*2+2})`  // Only 2 parameters per row
-           ).join(',')}`,
+           VALUES ${phoneValues.map((_, i) => `($${i*2+1}, $${i*2+2})`).join(',')}`,
           phoneValues.flat()
         );
       }
       
       // Get full contact with phones
       const phones = await client.query(
-        `SELECT * FROM contact_phone_numbers 
-         WHERE contact_id = $1
-         ORDER BY contact_id ASC`,
+        `SELECT id, contact_id as "contactId", phone_number as "phoneNumber" 
+         FROM contact_phone_numbers 
+         WHERE contact_id = $1`,
         [contact.id]
       );
       
       apiResponse(res, 201, {
-        ...contact,
-        phone_numbers: phones.rows
+        id: contact.id,
+        userId: contact.user_id,
+        name: contact.name,
+        isEmergency: contact.is_emergency,
+        relationship: contact.relationship,
+        image: contact.image,
+        phoneNumbers: phones.rows
       }, 'Contact created successfully');
     });
   })
@@ -158,14 +157,14 @@ router.put('/:id',
   validateRequest([
     param('id').isInt().toInt(),
     body('name').optional().trim().notEmpty(),
-    body('is_emergency').optional().isBoolean(),
+    body('isEmergency').optional().isBoolean(),
     body('relationship').optional().trim(),
     body('image').optional().trim(),
-    body('phone_numbers').optional().isArray()
+    body('phoneNumbers').optional().isArray()
   ]),
   asyncHandler(async (req, res) => {
     const { id } = req.params;
-    const { name, is_emergency, relationship, image, phone_numbers } = req.body;
+    const { name, isEmergency, relationship, image, phoneNumbers } = req.body;
     
     // Check if contact belongs to user
     const contactCheck = await db.query(
@@ -192,33 +191,30 @@ router.put('/:id',
           updated_at = NOW()
          WHERE id = $5
          RETURNING *`,
-        [name, is_emergency, relationship, image, id]
+        [name, isEmergency, relationship, image, id]
       );
       
       const contact = result.rows[0];
       
       // Update phone numbers if provided
-      if (phone_numbers) {
+      if (phoneNumbers) {
         // Delete existing phone numbers
         await client.query(
-          `DELETE FROM contact_phone_numbers
-           WHERE contact_id = $1`,
+          `DELETE FROM contact_phone_numbers WHERE contact_id = $1`,
           [id]
         );
         
         // Insert new phone numbers
-        if (phone_numbers.length > 0) {
-          const phoneValues = phone_numbers.map(phone => [
+        if (phoneNumbers.length > 0) {
+          const phoneValues = phoneNumbers.map(phone => [
             id,
-            phone.phone_number
+            phone.phoneNumber
           ]);
           
           await client.query(
             `INSERT INTO contact_phone_numbers
              (contact_id, phone_number)
-             VALUES ${phoneValues.map((_, i) => 
-               `($${i*2+1}, $${i*2+2})`  // Only 2 parameters per row
-             ).join(',')}`,
+             VALUES ${phoneValues.map((_, i) => `($${i*2+1}, $${i*2+2})`).join(',')}`,
             phoneValues.flat()
           );
         }
@@ -226,15 +222,20 @@ router.put('/:id',
       
       // Get updated contact with phones
       const phones = await client.query(
-        `SELECT * FROM contact_phone_numbers 
-         WHERE contact_id = $1
-         ORDER BY contact_id ASC`,
+        `SELECT id, contact_id as "contactId", phone_number as "phoneNumber"
+         FROM contact_phone_numbers 
+         WHERE contact_id = $1`,
         [id]
       );
       
       apiResponse(res, 200, {
-        ...contact,
-        phone_numbers: phones.rows
+        id: contact.id,
+        userId: contact.user_id,
+        name: contact.name,
+        isEmergency: contact.is_emergency,
+        relationship: contact.relationship,
+        image: contact.image,
+        phoneNumbers: phones.rows
       }, 'Contact updated successfully');
     });
   })
@@ -265,15 +266,13 @@ router.delete('/:id',
     await db.transaction(async (client) => {
       // Delete phone numbers first
       await client.query(
-        `DELETE FROM contact_phone_numbers
-         WHERE contact_id = $1`,
+        `DELETE FROM contact_phone_numbers WHERE contact_id = $1`,
         [id]
       );
       
       // Then delete contact
       await client.query(
-        `DELETE FROM contacts
-         WHERE id = $1`,
+        `DELETE FROM contacts WHERE id = $1`,
         [id]
       );
       
