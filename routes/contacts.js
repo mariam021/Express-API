@@ -110,45 +110,49 @@ router.post('/',
     
     await db.transaction(async (client) => {
       // Insert contact
-      const contactResult = await client.query(
+      const result = await client.query(
         `INSERT INTO contacts
          (user_id, name, is_emergency, relationship, image)
          VALUES ($1, $2, $3, $4, $5)
          RETURNING *`,
-        [user_id, name, is_emergency, relationship, image]
-      );
-      
-      const contact = contactResult.rows[0];
-      
-      // Insert phone numbers if provided
-      if (phone_numbers.length > 0) {
-        const phoneValues = phone_numbers.map(phone => [
-          contact.id,
-          phone.phone_number
+        [userId, name, isEmergency, relationship, image]
+    );
+    
+    const contact = result.rows[0];
+    
+    // Insert phone numbers if provided
+    if (phoneNumbers && phoneNumbers.length > 0) {
+        const phoneValues = phoneNumbers.map(phone => [
+            contact.id,
+            phone.phoneNumber
         ]);
         
         await client.query(
-          `INSERT INTO contact_phone_numbers
-           (contact_id, phone_number)
-           VALUES ${phoneValues.map((_, i) => 
-             `($${i*2+1}, $${i*2+2})`  // Only 2 parameters per row
-           ).join(',')}`,
-          phoneValues.flat()
+            `INSERT INTO contact_phone_numbers
+             (contact_id, phone_number)
+             VALUES ${phoneValues.map((_, i) => `($${i*2+1}, $${i*2+2})`).join(',')}
+             RETURNING id, contact_id as "contactId", phone_number as "phoneNumber"`,
+            phoneValues.flat()
         );
-      }
-      
-      // Get full contact with phones
-      const phones = await client.query(
-        `SELECT * FROM contact_phone_numbers 
-         WHERE contact_id = $1
-         ORDER BY contact_id ASC`,
+    }
+    
+    // Get the newly inserted phone numbers
+    const phones = await client.query(
+        `SELECT id, contact_id as "contactId", phone_number as "phoneNumber"
+         FROM contact_phone_numbers 
+         WHERE contact_id = $1`,
         [contact.id]
-      );
-      
-      apiResponse(res, 201, {
-        ...contact,
-        phone_numbers: phones.rows
-      }, 'Contact created successfully');
+    );
+    
+    apiResponse(res, 201, {
+        id: contact.id,
+        userId: contact.user_id,
+        name: contact.name,
+        isEmergency: contact.is_emergency,
+        relationship: contact.relationship,
+        image: contact.image,
+        phoneNumbers: phones.rows // Include the phone numbers in the response
+    }, 'Contact created successfully');
     });
   })
 );
