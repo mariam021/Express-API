@@ -92,7 +92,8 @@ router.get('/users/:userId/',
 );
 
 // Create contact
-router.post('/',
+// In your contact creation route
+router.post('/', 
   validateRequest([
     body('name').trim().notEmpty().withMessage('Name is required'),
     body('isEmergency').optional().isBoolean(),
@@ -106,49 +107,40 @@ router.post('/',
     
     await db.transaction(async (client) => {
       // Insert contact
-      const result = await client.query(
+      const contactResult = await client.query(
         `INSERT INTO contacts
          (user_id, name, is_emergency, relationship, image)
          VALUES ($1, $2, $3, $4, $5)
          RETURNING *`,
         [userId, name, isEmergency, relationship, image]
-    );
-    
-    const contact = result.rows[0];
-    
-    // Insert phone numbers if provided
-    if (phoneNumbers && phoneNumbers.length > 0) {
-        const phoneValues = phoneNumbers.map(phone => [
-            contact.id,
-            phone.phoneNumber
-        ]);
-        
-        await client.query(
+      );
+      
+      const contact = contactResult.rows[0];
+      
+      // Insert phone numbers if provided
+      const insertedPhones = [];
+      if (phoneNumbers.length > 0) {
+        for (const phone of phoneNumbers) {
+          const phoneResult = await client.query(
             `INSERT INTO contact_phone_numbers
              (contact_id, phone_number)
-             VALUES ${phoneValues.map((_, i) => `($${i*2+1}, $${i*2+2})`).join(',')}
+             VALUES ($1, $2)
              RETURNING id, contact_id as "contactId", phone_number as "phoneNumber"`,
-            phoneValues.flat()
-        );
-    }
-    
-    // Get the newly inserted phone numbers
-    const phones = await client.query(
-        `SELECT id, contact_id as "contactId", phone_number as "phoneNumber"
-         FROM contact_phone_numbers 
-         WHERE contact_id = $1`,
-        [contact.id]
-    );
-    
-    apiResponse(res, 201, {
+            [contact.id, phone.phoneNumber]
+          );
+          insertedPhones.push(phoneResult.rows[0]);
+        }
+      }
+      
+      apiResponse(res, 201, {
         id: contact.id,
         userId: contact.user_id,
         name: contact.name,
         isEmergency: contact.is_emergency,
         relationship: contact.relationship,
         image: contact.image,
-        phoneNumbers: phones.rows // Include the phone numbers in the response
-    }, 'Contact created successfully');
+        phoneNumbers: insertedPhones // Include the inserted phone numbers
+      }, 'Contact created successfully');
     });
   })
 );
