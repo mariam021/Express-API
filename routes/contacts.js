@@ -20,7 +20,7 @@ router.get('/users/:user_id/',
     const user_id = req.params.user_id;
     
     // Authorization check
-    if (parseInt(user_id) !== req.user.userId) {
+    if (parseInt(user_id) !== req.user.user_id) {
       return res.status(403).json({
         success: false,
         message: 'Not authorized to access these contacts'
@@ -33,13 +33,13 @@ router.get('/users/:user_id/',
     const contactsResult = await db.query(`
       SELECT 
         c.id,
-        c.user_id as "userId",
+        c.user_id,
         c.name,
-        c.is_emergency as "isEmergency",
+        c.is_emergency,
         c.relationship,
         c.image,
         p.id as "phoneId",
-        p.phone_number as "phoneNumber"
+        p.phone_number
       FROM contacts c
       LEFT JOIN contact_phone_numbers p ON c.id = p.contact_id
       WHERE c.user_id = $1
@@ -54,20 +54,20 @@ router.get('/users/:user_id/',
       if (!contactsMap.has(row.id)) {
         contactsMap.set(row.id, {
           id: row.id,
-          userId: row.userId,
+          user_id: row.user_id,
           name: row.name,
-          isEmergency: row.isEmergency,
+          is_emergency: row.is_emergency,
           relationship: row.relationship,
           image: row.image,
-          phoneNumbers: []
+          phone_numbers: [] // Using the correct field name expected by Android
         });
       }
       
       if (row.phoneId) {
-        contactsMap.get(row.id).phoneNumbers.push({
+        contactsMap.get(row.id).phone_numbers.push({
           id: row.phoneId,
           contactId: row.id,
-          phoneNumber: row.phoneNumber
+          phone_number: row.phone_number
         });
       }
     });
