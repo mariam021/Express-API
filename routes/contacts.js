@@ -19,7 +19,7 @@ router.get('/users/:userId/',
     const userId = req.params.userId;
     
     // Authorization check
-    if (parseInt(userId) !== req.user.userId) {
+    if (parseInt(user_id) !== req.user.user_id) {
       return res.status(403).json({
         success: false,
         message: 'Not authorized to access these contacts'
@@ -58,7 +58,7 @@ router.get('/users/:userId/',
           is_emergency: row.is_emergency,
           relationship: row.relationship,
           image: row.image,
-          phoneNumbers: [] // Using the correct field name expected by Android
+          phone_numbers: [] // Using the correct field name expected by Android
         });
       }
       
@@ -102,8 +102,8 @@ router.post('/',
     body('phoneNumbers').optional().isArray()
   ]),
   asyncHandler(async (req, res) => {
-    const userId = req.user.userId;
-    const { name, isEmergency = false, relationship, image, phoneNumbers = [] } = req.body;
+    const user_id = req.user.user_id;
+    const { name, is_emergency = false, relationship, image, phone_numbers = [] } = req.body;
     
     await db.transaction(async (client) => {
       // Insert contact
@@ -118,36 +118,28 @@ router.post('/',
       const contact = contactResult.rows[0];
       
       // Insert phone numbers if provided
-      if (phoneNumbers.length > 0) {
-        const phoneValues = phoneNumbers.map(phone => [
-          contact.id,
-          phone.phoneNumber
-        ]);
-        
-        await client.query(
-          `INSERT INTO contact_phone_numbers
-           (contact_id, phone_number)
-           VALUES ${phoneValues.map((_, i) => `($${i*2+1}, $${i*2+2})`).join(',')}`,
-          phoneValues.flat()
-        );
+      const insertedPhones = [];
+      if (phone_numbers.length > 0) {
+        for (const phone of phone_numbers) {
+          const phoneResult = await client.query(
+            `INSERT INTO contact_phone_numbers
+             (contact_id, phone_number)
+             VALUES ($1, $2)
+             RETURNING id, contact_id as "contactId", phone_number as "phoneNumber"`,
+            [contact.id, phone.phoneNumber]
+          );
+          insertedPhones.push(phoneResult.rows[0]);
+        }
       }
-      
-      // Get full contact with phones
-      const phones = await client.query(
-        `SELECT id, contact_id as "contactId", phone_number as "phoneNumber" 
-         FROM contact_phone_numbers 
-         WHERE contact_id = $1`,
-        [contact.id]
-      );
       
       apiResponse(res, 201, {
         id: contact.id,
-        userId: contact.user_id,
+        user_id: contact.user_id,
         name: contact.name,
-        isEmergency: contact.is_emergency,
+        is_emergency: contact.is_emergency,
         relationship: contact.relationship,
         image: contact.image,
-        phoneNumbers: phones.rows
+        phone_numbers: insertedPhones // Include the inserted phone numbers
       }, 'Contact created successfully');
     });
   })
