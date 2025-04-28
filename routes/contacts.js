@@ -105,8 +105,7 @@ router.post('/',
     body('phone_numbers').optional().isArray()
   ]),
   asyncHandler(async (req, res) => {
-    // Always use the authenticated user's ID
-    const user_id = req.user.userId;
+    const user_id = req.user.user_id;
     const { name, is_emergency = false, relationship, image, phone_numbers = [] } = req.body;
     
     await db.transaction(async (client) => {
@@ -116,15 +115,15 @@ router.post('/',
          (user_id, name, is_emergency, relationship, image)
          VALUES ($1, $2, $3, $4, $5)
          RETURNING *`,
-        [userId, name, isEmergency, relationship, image]
+        [user_id, name, is_emergency, relationship, image]
       );
       
       const contact = contactResult.rows[0];
       
       // Insert phone numbers if provided
       const insertedPhones = [];
-      if (phoneNumbers.length > 0) {
-        for (const phone of phoneNumbers) {
+      if (phone_numbers.length > 0) {
+        for (const phone of phone_numbers) {
           const phoneResult = await client.query(
             `INSERT INTO contact_phone_numbers
              (contact_id, phone_number)
@@ -138,17 +137,16 @@ router.post('/',
       
       apiResponse(res, 201, {
         id: contact.id,
-        userId: contact.user_id,
+        user_id: contact.user_id,
         name: contact.name,
-        isEmergency: contact.is_emergency,
+        is_emergency: contact.is_emergency,
         relationship: contact.relationship,
         image: contact.image,
-        phoneNumbers: insertedPhones // Include the inserted phone numbers
+        phone_numbers: insertedPhones // Include the inserted phone numbers
       }, 'Contact created successfully');
     });
   })
 );
-
 
 // Update contact
 router.put('/:id',
