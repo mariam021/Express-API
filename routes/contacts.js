@@ -32,7 +32,7 @@ router.get('/users/:userId/',
     const contactsResult = await db.query(`
       SELECT 
         c.id,
-        c.userId,
+        c.user_id,
         c.name,
         c.is_emergency,
         c.relationship,
@@ -41,7 +41,7 @@ router.get('/users/:userId/',
         p.phone_number
       FROM contacts c
       LEFT JOIN contact_phone_numbers p ON c.id = p.contact_id
-      WHERE c.userId = $1
+      WHERE c.user_id = $1
       ORDER BY c.is_emergency DESC, c.name ASC
       LIMIT $2 OFFSET $3`,
       [userId, limit, offset]
@@ -53,7 +53,7 @@ router.get('/users/:userId/',
       if (!contactsMap.has(row.id)) {
         contactsMap.set(row.id, {
           id: row.id,
-          userId: row.userId,
+          user_id: row.user_id,
           name: row.name,
           is_emergency: row.is_emergency,
           relationship: row.relationship,
@@ -65,7 +65,7 @@ router.get('/users/:userId/',
       if (row.phoneId) {
         contactsMap.get(row.id).phone_numbers.push({
           id: row.phoneId,
-          contactId: row.id,
+          contact_id: row.id,
           phone_number: row.phone_number
         });
       }
@@ -73,7 +73,7 @@ router.get('/users/:userId/',
     
     // Get total count for pagination
     const countResult = await db.query(
-      'SELECT COUNT(*) FROM contacts WHERE userId = $1',
+      'SELECT COUNT(*) FROM contacts WHERE user_id = $1',
       [userId]
     );
     
@@ -92,7 +92,6 @@ router.get('/users/:userId/',
 );
 
 // Create contact
-// In your contact creation route
 router.post('/', 
   validateRequest([
     body('name').trim().notEmpty().withMessage('Name is required'),
@@ -125,22 +124,24 @@ router.post('/',
             `INSERT INTO contact_phone_numbers
              (contact_id, phone_number)
              VALUES ($1, $2)
-             RETURNING id, contact_id as "contactId", phone_number as "phoneNumber"`,
-            [contact.id, phone.phoneNumber]
+             RETURNING id, contact_id, phone_number`,
+            [contact.id, phone.phone_number]
           );
           insertedPhones.push(phoneResult.rows[0]);
         }
       }
       
-      apiResponse(res, 201, {
+      const response = {
         id: contact.id,
-        userId: contact.userId,
+        user_id: contact.user_id,
         name: contact.name,
         is_emergency: contact.is_emergency,
         relationship: contact.relationship,
         image: contact.image,
-        phone_numbers: insertedPhones // Include the inserted phone numbers
-      }, 'Contact created successfully');
+        phone_numbers: insertedPhones
+      };
+      
+      apiResponse(res, 201, response, 'Contact created successfully');
     });
   })
 );
@@ -161,7 +162,7 @@ router.put('/:id',
     
     // Check if contact belongs to user
     const contactCheck = await db.query(
-      'SELECT userId FROM contacts WHERE id = $1',
+      'SELECT user_id FROM contacts WHERE id = $1',
       [id]
     );
     
@@ -169,7 +170,7 @@ router.put('/:id',
       return apiResponse(res, 404, null, 'Contact not found');
     }
     
-    if (contactCheck.rows[0].userId !== req.user.userId) {
+    if (contactCheck.rows[0].user_id !== req.user.userId) {
       return apiResponse(res, 403, null, 'Not authorized to update this contact');
     }
     
@@ -198,38 +199,48 @@ router.put('/:id',
         );
         
         // Insert new phone numbers
+        const insertedPhones = [];
         if (phone_numbers.length > 0) {
-          const phoneValues = phone_numbers.map(phone => [
-            id,
-            phone.phoneNumber
-          ]);
-          
-          await client.query(
-            `INSERT INTO contact_phone_numbers
-             (contact_id, phone_number)
-             VALUES ${phoneValues.map((_, i) => `($${i*2+1}, $${i*2+2})`).join(',')}`,
-            phoneValues.flat()
-          );
+          for (const phone of phone_numbers) {
+            const phoneResult = await client.query(
+              `INSERT INTO contact_phone_numbers
+               (contact_id, phone_number)
+               VALUES ($1, $2)
+               RETURNING id, contact_id, phone_number`,
+              [id, phone.phone_number]
+            );
+            insertedPhones.push(phoneResult.rows[0]);
+          }
         }
+        
+        apiResponse(res, 200, {
+          id: contact.id,
+          user_id: contact.user_id,
+          name: contact.name,
+          is_emergency: contact.is_emergency,
+          relationship: contact.relationship,
+          image: contact.image,
+          phone_numbers: insertedPhones
+        }, 'Contact updated successfully');
+      } else {
+        // Get updated contact with phones
+        const phones = await client.query(
+          `SELECT id, contact_id, phone_number
+           FROM contact_phone_numbers 
+           WHERE contact_id = $1`,
+          [id]
+        );
+        
+        apiResponse(res, 200, {
+          id: contact.id,
+          user_id: contact.user_id,
+          name: contact.name,
+          is_emergency: contact.is_emergency,
+          relationship: contact.relationship,
+          image: contact.image,
+          phone_numbers: phones.rows
+        }, 'Contact updated successfully');
       }
-      
-      // Get updated contact with phones
-      const phones = await client.query(
-        `SELECT id, contact_id as "contactId", phone_number as "phoneNumber"
-         FROM contact_phone_numbers 
-         WHERE contact_id = $1`,
-        [id]
-      );
-      
-      apiResponse(res, 200, {
-        id: contact.id,
-        userId: contact.userId,
-        name: contact.name,
-        is_emergency: contact.is_emergency,
-        relationship: contact.relationship,
-        image: contact.image,
-        phone_numbers: phones.rows
-      }, 'Contact updated successfully');
     });
   })
 );
@@ -244,7 +255,7 @@ router.delete('/:id',
     
     // Check if contact belongs to user
     const contactCheck = await db.query(
-      'SELECT userId FROM contacts WHERE id = $1',
+      'SELECT user_id FROM contacts WHERE id = $1',
       [id]
     );
     
@@ -252,7 +263,7 @@ router.delete('/:id',
       return apiResponse(res, 404, null, 'Contact not found');
     }
     
-    if (contactCheck.rows[0].userId !== req.user.userId) {
+    if (contactCheck.rows[0].user_id !== req.user.userId) {
       return apiResponse(res, 403, null, 'Not authorized to delete this contact');
     }
     

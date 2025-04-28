@@ -33,13 +33,13 @@ router.get('/contact/:contactId',
     }
     
     const result = await db.query(
-      `SELECT * FROM contact_phone_numbers
+      `SELECT id, contact_id, phone_number FROM contact_phone_numbers
        WHERE contact_id = $1
-       ORDER BY contact_id ASC`,
+       ORDER BY id ASC`,
       [contactId]
     );
     
-    apiResponse(res, 200, result.rows);
+    apiResponse(res, 200, result.rows, 'Phone numbers retrieved successfully');
   })
 );
 
@@ -52,7 +52,7 @@ router.get('/:id',
     const { id } = req.params;
     
     const phoneResult = await db.query(
-      `SELECT cpn.* FROM contact_phone_numbers cpn
+      `SELECT cpn.id, cpn.contact_id, cpn.phone_number FROM contact_phone_numbers cpn
        JOIN contacts c ON cpn.contact_id = c.id
        WHERE cpn.id = $1`,
       [id]
@@ -72,7 +72,7 @@ router.get('/:id',
       return apiResponse(res, 403, null, 'Not authorized to access this phone number');
     }
     
-    apiResponse(res, 200, phoneResult.rows[0]);
+    apiResponse(res, 200, phoneResult.rows[0], 'Phone number retrieved successfully');
   })
 );
 
@@ -100,13 +100,12 @@ router.post('/',
     }
     
     await db.transaction(async (client) => {
-      
-      // Insert new phone number - FIX: Removed extra placeholder ($3)
+      // Insert new phone number
       const result = await client.query(
         `INSERT INTO contact_phone_numbers
          (contact_id, phone_number)
          VALUES ($1, $2)
-         RETURNING *`,
+         RETURNING id, contact_id, phone_number`,
         [contact_id, phone_number]
       );
       
@@ -142,13 +141,12 @@ router.put('/:id',
     }
     
     await db.transaction(async (client) => {
-      
-      // Update phone number - FIX: Corrected parameter indexing
+      // Update phone number - Fixed parameter indexing
       const result = await client.query(
         `UPDATE contact_phone_numbers SET
          phone_number = COALESCE($1, phone_number)
          WHERE id = $2
-         RETURNING *`,
+         RETURNING id, contact_id, phone_number`,
         [phone_number, id]
       );
       
