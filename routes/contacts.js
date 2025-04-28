@@ -19,7 +19,7 @@ router.get('/users/:userId/',
     const userId = req.params.userId;
     
     // Authorization check
-    if (parseInt(user_id) !== req.user.user_id) {
+    if (parseInt(userId) !== req.user.userId) {
       return res.status(403).json({
         success: false,
         message: 'Not authorized to access these contacts'
@@ -32,7 +32,7 @@ router.get('/users/:userId/',
     const contactsResult = await db.query(`
       SELECT 
         c.id,
-        c.user_id,
+        c.userId,
         c.name,
         c.is_emergency,
         c.relationship,
@@ -41,7 +41,7 @@ router.get('/users/:userId/',
         p.phone_number
       FROM contacts c
       LEFT JOIN contact_phone_numbers p ON c.id = p.contact_id
-      WHERE c.user_id = $1
+      WHERE c.userId = $1
       ORDER BY c.is_emergency DESC, c.name ASC
       LIMIT $2 OFFSET $3`,
       [userId, limit, offset]
@@ -53,7 +53,7 @@ router.get('/users/:userId/',
       if (!contactsMap.has(row.id)) {
         contactsMap.set(row.id, {
           id: row.id,
-          user_id: row.user_id,
+          userId: row.userId,
           name: row.name,
           is_emergency: row.is_emergency,
           relationship: row.relationship,
@@ -73,7 +73,7 @@ router.get('/users/:userId/',
     
     // Get total count for pagination
     const countResult = await db.query(
-      'SELECT COUNT(*) FROM contacts WHERE user_id = $1',
+      'SELECT COUNT(*) FROM contacts WHERE userId = $1',
       [userId]
     );
     
@@ -102,14 +102,14 @@ router.post('/',
     body('phoneNumbers').optional().isArray()
   ]),
   asyncHandler(async (req, res) => {
-    const user_id = req.user.user_id;
+    const userId = req.user.userId;
     const { name, is_emergency = false, relationship, image, phone_numbers = [] } = req.body;
     
     await db.transaction(async (client) => {
       // Insert contact
       const contactResult = await client.query(
         `INSERT INTO contacts
-         (user_id, name, is_emergency, relationship, image)
+         (userId, name, is_emergency, relationship, image)
          VALUES ($1, $2, $3, $4, $5)
          RETURNING *`,
         [userId, name, isEmergency, relationship, image]
@@ -134,7 +134,7 @@ router.post('/',
       
       apiResponse(res, 201, {
         id: contact.id,
-        user_id: contact.user_id,
+        userId: contact.userId,
         name: contact.name,
         is_emergency: contact.is_emergency,
         relationship: contact.relationship,
@@ -161,7 +161,7 @@ router.put('/:id',
     
     // Check if contact belongs to user
     const contactCheck = await db.query(
-      'SELECT user_id FROM contacts WHERE id = $1',
+      'SELECT userId FROM contacts WHERE id = $1',
       [id]
     );
     
@@ -169,7 +169,7 @@ router.put('/:id',
       return apiResponse(res, 404, null, 'Contact not found');
     }
     
-    if (contactCheck.rows[0].user_id !== req.user.userId) {
+    if (contactCheck.rows[0].userId !== req.user.userId) {
       return apiResponse(res, 403, null, 'Not authorized to update this contact');
     }
     
@@ -223,7 +223,7 @@ router.put('/:id',
       
       apiResponse(res, 200, {
         id: contact.id,
-        userId: contact.user_id,
+        userId: contact.userId,
         name: contact.name,
         isEmergency: contact.is_emergency,
         relationship: contact.relationship,
@@ -244,7 +244,7 @@ router.delete('/:id',
     
     // Check if contact belongs to user
     const contactCheck = await db.query(
-      'SELECT user_id FROM contacts WHERE id = $1',
+      'SELECT userId FROM contacts WHERE id = $1',
       [id]
     );
     
@@ -252,7 +252,7 @@ router.delete('/:id',
       return apiResponse(res, 404, null, 'Contact not found');
     }
     
-    if (contactCheck.rows[0].user_id !== req.user.userId) {
+    if (contactCheck.rows[0].userId !== req.user.userId) {
       return apiResponse(res, 403, null, 'Not authorized to delete this contact');
     }
     
