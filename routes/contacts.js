@@ -96,10 +96,10 @@ router.get('/users/:userId/',
 router.post('/', 
   validateRequest([
     body('name').trim().notEmpty().withMessage('Name is required'),
-    body('isEmergency').optional().isBoolean(),
+    body('is_emergency').optional().isBoolean(),
     body('relationship').optional().trim(),
     body('image').optional().trim(),
-    body('phoneNumbers').optional().isArray()
+    body('phone_numbers').optional().isArray()
   ]),
   asyncHandler(async (req, res) => {
     const userId = req.user.userId;
@@ -112,7 +112,7 @@ router.post('/',
          (userId, name, is_emergency, relationship, image)
          VALUES ($1, $2, $3, $4, $5)
          RETURNING *`,
-        [userId, name, isEmergency, relationship, image]
+        [userId, name, is_emergency, relationship, image]
       );
       
       const contact = contactResult.rows[0];
@@ -150,14 +150,14 @@ router.put('/:id',
   validateRequest([
     param('id').isInt().toInt(),
     body('name').optional().trim().notEmpty(),
-    body('isEmergency').optional().isBoolean(),
+    body('is_emergency').optional().isBoolean(),
     body('relationship').optional().trim(),
     body('image').optional().trim(),
-    body('phoneNumbers').optional().isArray()
+    body('phone_numbers').optional().isArray()
   ]),
   asyncHandler(async (req, res) => {
     const { id } = req.params;
-    const { name, isEmergency, relationship, image, phoneNumbers } = req.body;
+    const { name, is_emergency, relationship, image, phone_numbers } = req.body;
     
     // Check if contact belongs to user
     const contactCheck = await db.query(
@@ -184,13 +184,13 @@ router.put('/:id',
           updated_at = NOW()
          WHERE id = $5
          RETURNING *`,
-        [name, isEmergency, relationship, image, id]
+        [name, is_emergency, relationship, image, id]
       );
       
       const contact = result.rows[0];
       
       // Update phone numbers if provided
-      if (phoneNumbers) {
+      if (phone_numbers) {
         // Delete existing phone numbers
         await client.query(
           `DELETE FROM contact_phone_numbers WHERE contact_id = $1`,
@@ -198,8 +198,8 @@ router.put('/:id',
         );
         
         // Insert new phone numbers
-        if (phoneNumbers.length > 0) {
-          const phoneValues = phoneNumbers.map(phone => [
+        if (phone_numbers.length > 0) {
+          const phoneValues = phone_numbers.map(phone => [
             id,
             phone.phoneNumber
           ]);
@@ -225,10 +225,10 @@ router.put('/:id',
         id: contact.id,
         userId: contact.userId,
         name: contact.name,
-        isEmergency: contact.is_emergency,
+        is_emergency: contact.is_emergency,
         relationship: contact.relationship,
         image: contact.image,
-        phoneNumbers: phones.rows
+        phone_numbers: phones.rows
       }, 'Contact updated successfully');
     });
   })
