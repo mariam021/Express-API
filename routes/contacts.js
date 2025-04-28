@@ -109,7 +109,7 @@ router.post('/',
       // Insert contact
       const contactResult = await client.query(
         `INSERT INTO contacts
-         (userId, name, is_emergency, relationship, image)
+         (user_id, name, is_emergency, relationship, image)
          VALUES ($1, $2, $3, $4, $5)
          RETURNING *`,
         [userId, name, is_emergency, relationship, image]
