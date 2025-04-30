@@ -181,8 +181,7 @@ router.put('/:id',
           name = COALESCE($1, name),
           is_emergency = COALESCE($2, is_emergency),
           relationship = COALESCE($3, relationship),
-          image = COALESCE($4, image),
-          updated_at = NOW()
+          image = COALESCE($4, image)
          WHERE id = $5
          RETURNING *`,
         [name, is_emergency, relationship, image, id]

@@ -165,7 +165,7 @@ router.delete('/:id',
     
     // Check if phone number exists and belongs to user's contact
     const phoneCheck = await db.query(
-      `SELECT cpn.*, c.user_id FROM contact_phone_numbers cpn
+      `SELECT cpn.*, ac.user_id FROM contact_phone_numbers cpn
        JOIN contacts c ON cpn.contact_id = c.id
        WHERE cpn.id = $1`,
       [id]
