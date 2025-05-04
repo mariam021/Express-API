@@ -265,8 +265,6 @@ router.put('/:id',
       return apiResponse(res, 400, null, 'No valid fields to update');
     }
     
-    updates.push(`updated_at = NOW()`);
-    
     values.push(id);
     const query = `
       UPDATE users SET
