@@ -72,7 +72,7 @@ router.post('/signup',
         user: {
           id: newUser.rows[0].id,
           name: newUser.rows[0].name,
-          phoneNumber: newUser.rows[0].phone_number
+          phone_number: newUser.rows[0].phone_number
         }
       },
     });
@@ -94,7 +94,7 @@ router.get('/all',
 
     // Get paginated users
     const result = await db.query(
-      `SELECT id, name, age, mac, phone_number as "phoneNumber", image
+      `SELECT id, name, age, mac, phone_number, image
        FROM users 
        LIMIT $1 OFFSET $2`,
       [limit, offset]
@@ -151,7 +151,7 @@ router.post('/login',
         user: {
           id: user.rows[0].id,
           name: user.rows[0].name,
-          phoneNumber: phone_number
+          phone_number: phone_number
         }
       },
     });
@@ -163,7 +163,7 @@ router.get('/me',
   authenticate,
   asyncHandler(async (req, res) => {
     const result = await db.query(
-      `SELECT id, name, age, mac, phone_number as "phoneNumber", image
+      `SELECT id, name, age, mac, phone_number, image
        FROM users WHERE id = $1`,
       [req.user.userId]
     );
@@ -185,7 +185,7 @@ router.get('/:id',
     const { id } = req.params;
     
     const result = await db.query(
-      `SELECT id, name, age, mac, phone_number as "phoneNumber", image
+      `SELECT id, name, age, mac, phone_number, image
        FROM users WHERE id = $1`,
       [id]
     );
@@ -270,7 +270,7 @@ router.put('/:id',
       UPDATE users SET
         ${updates.join(', ')}
       WHERE id = $${counter}
-      RETURNING id, name, age, mac, phone_number as "phoneNumber", image
+      RETURNING id, name, age, mac, phone_number, image
     `;
     
     const result = await db.query(query, values);
