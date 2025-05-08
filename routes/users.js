@@ -1,4 +1,3 @@
-// routes/users.js
 import express from 'express';
 import { body, param } from 'express-validator';
 import bcrypt from 'bcryptjs';
@@ -35,10 +34,13 @@ router.post('/signup',
   validateRequest([
     body('name').trim().notEmpty(),
     body('password').isLength({ min: 6 }),
-    body('phone_number').isMobilePhone()
+    body('phone_number').isMobilePhone(),
+    body('age').optional().isInt({ min: 1 }),
+    body('mac').optional().isMACAddress(),
+    body('image').optional().trim() // Image as a local file path (string)
   ]),
   asyncHandler(async (req, res) => {
-    const { name, password, phone_number } = req.body;
+    const { name, password, phone_number, age, mac, image } = req.body;
 
     // 1. Check if user exists
     const exists = await db.query(
@@ -55,10 +57,10 @@ router.post('/signup',
 
     // 3. Create user
     const newUser = await db.query(
-      `INSERT INTO users (name, password, phone_number)
-       VALUES ($1, $2, $3)
-       RETURNING id, name, phone_number`,
-      [name, hashedPassword, phone_number]
+      `INSERT INTO users (name, password, phone_number, age, mac, image)
+       VALUES ($1, $2, $3, $4, $5, $6)
+       RETURNING id, name, phone_number, age, mac, image`,
+      [name, hashedPassword, phone_number, age, mac, image]
     );
 
     // 4. Generate token
@@ -69,11 +71,7 @@ router.post('/signup',
       success: true,
       data: {
         token: token,
-        user: {
-          id: newUser.rows[0].id,
-          name: newUser.rows[0].name,
-          phone_number: newUser.rows[0].phone_number
-        }
+        user: newUser.rows[0]
       },
     });
   })
@@ -125,7 +123,7 @@ router.post('/login',
 
     // 1. Find user
     const user = await db.query(
-      `SELECT id, name, password FROM users 
+      `SELECT id, name, password, phone_number FROM users 
        WHERE phone_number = $1`, 
       [phone_number]
     );
@@ -151,7 +149,7 @@ router.post('/login',
         user: {
           id: user.rows[0].id,
           name: user.rows[0].name,
-          phone_number: phone_number
+          phone_number: user.rows[0].phone_number
         }
       },
     });
@@ -208,9 +206,8 @@ router.put('/:id',
     body('age').optional().isInt({ min: 1 }),
     body('mac').optional().isMACAddress(),
     body('phone_number').optional().isMobilePhone(),
-    body('image').optional().isURL()
+    body('image').optional().trim() // Image as a local file path (string)
   ]),
-  
   asyncHandler(async (req, res) => {
     const { id } = req.params;
     const { name, password, age, mac, phone_number, image } = req.body;
@@ -255,7 +252,7 @@ router.put('/:id',
       counter++;
     }
     
-    if (image) {
+    if (image !== undefined) { // Allow null to clear the image
       updates.push(`image = $${counter}`);
       values.push(image);
       counter++;
