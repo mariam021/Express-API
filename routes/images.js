@@ -2,8 +2,6 @@ import express from 'express';
 import multer from 'multer';
 import path from 'path';
 import { apiResponse, asyncHandler, authenticate } from '../libs/utils.js';
-import { validateRequest } from '../middleware/validator.js';
-import db from '../libs/db.js';
 
 const router = express.Router();
 
@@ -14,17 +12,19 @@ const storage = multer.diskStorage({
   },
   filename: (req, file, cb) => {
     const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e9);
-    cb(null, uniqueSuffix + path.extname(file.originalname));
+    cb(null, uniqueSuffix + path.extname(file.originalname).toLowerCase());
   },
 });
 
 const upload = multer({
   storage,
   fileFilter: (req, file, cb) => {
-    const filetypes = /jpeg|jpg|png/;
+    // Allow jpeg, jpg, and png
+    const filetypes = /jpeg|jpg|png/i; // Case-insensitive
     const extname = filetypes.test(path.extname(file.originalname).toLowerCase());
-    const mimetype = filetypes.test(file.mimetype);
-    if (extname && mimetype) {
+    const mimetype = filetypes.test(file.mimetype) || file.mimetype === 'image/jpg';
+    
+    if (extname && (mimetype || file.mimetype === 'image/jpg')) {
       return cb(null, true);
     }
     cb(new Error('Only JPEG and PNG images are allowed'));
