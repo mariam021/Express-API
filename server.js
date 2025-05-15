@@ -11,6 +11,7 @@ import userRoutes from './routes/users.js';
 import contactRoutes from './routes/contacts.js';
 import phoneNumberRoutes from './routes/phoneNumbers.js';
 import authRoutes from './routes/auth.js';
+import imageRoutes from './routes/images.js';
 
 // Load environment variables
 dotenv.config();
@@ -30,6 +31,7 @@ app.use('/api/users', userRoutes);
 app.use('/api/contacts', contactRoutes);
 app.use('/api/phone-numbers', phoneNumberRoutes);
 app.use('/api/auth', authRoutes);
+app.use('/api/images', imageRoutes);
 
 // Root route
 app.get('/', (req, res) => {
