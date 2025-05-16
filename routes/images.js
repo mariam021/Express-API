@@ -50,7 +50,7 @@ router.post(
     
     // Generate the correct URL path for the uploaded image
     // This must match how you're serving the static files
-    const imageUrl = `https://express-api-production-725d.up.railway.app//api/images/uploads/${req.file.filename}`;
+    const imageUrl = `https://express-api-production-725d.up.railway.app/api/images/uploads/${req.file.filename}`;
     
     apiResponse(res, 200, { imageUrl }, 'Image uploaded successfully');
   })
