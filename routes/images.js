@@ -38,9 +38,6 @@ const upload = multer({
   limits: { fileSize: 5 * 1024 * 1024 }, // 5MB limit
 });
 
-// Serve uploaded images statically
-router.use('/uploads', express.static(uploadDir));
-
 // Upload image endpoint
 router.post(
   '/upload',
@@ -50,11 +47,16 @@ router.post(
     if (!req.file) {
       return apiResponse(res, 400, null, 'No image file provided');
     }
-
+    
     // Construct the URL for the uploaded image
-    const imageUrl = `${req.protocol}://${req.get('host')}/uploads/${req.file.filename}`;
+    // Use the ACTUAL path that will correctly resolve based on how static files are served
+    const imageUrl = `/api/uploads/${req.file.filename}`;
+    
     apiResponse(res, 200, { imageUrl }, 'Image uploaded successfully');
   })
 );
+
+// Serve uploaded images statically
+router.use('/uploads', express.static(path.join(process.cwd(), uploadDir)));
 
 export default router;
