@@ -48,15 +48,16 @@ router.post(
       return apiResponse(res, 400, null, 'No image file provided');
     }
     
-    // Construct the URL for the uploaded image
-    // Use the ACTUAL path that will correctly resolve based on how static files are served
-    const imageUrl = `/api/uploads/${req.file.filename}`;
+    // Generate the correct URL path for the uploaded image
+    // This must match how you're serving the static files
+    const imageUrl = `/api/images/uploads/${req.file.filename}`;
     
     apiResponse(res, 200, { imageUrl }, 'Image uploaded successfully');
   })
 );
 
 // Serve uploaded images statically
+// This line needs to match the URL path in imageUrl above
 router.use('/uploads', express.static(path.join(process.cwd(), uploadDir)));
 
 export default router;

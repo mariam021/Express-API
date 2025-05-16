@@ -1,9 +1,10 @@
-// server.js - Main entry point
+// server.js - Updated Main entry point
 import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import morgan from 'morgan';
 import dotenv from 'dotenv';
+import path from 'path'; // Add path import
 import { errorHandler } from './libs/utils.js';
 
 // Routes
@@ -25,6 +26,10 @@ app.use(helmet()); // Security headers
 app.use(cors()); // Enable CORS
 app.use(express.json()); // Parse JSON bodies
 app.use(morgan('dev')); // Logging
+
+// Set up static file serving for uploads directory directly
+// This is crucial for making uploads accessible
+app.use('/api/uploads', express.static(path.join(process.cwd(), 'uploads')));
 
 // Routes
 app.use('/api/users', userRoutes);
