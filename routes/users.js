@@ -37,10 +37,11 @@ router.post('/signup',
     body('phone_number').isMobilePhone(),
     body('age').optional().isInt({ min: 1 }),
     body('mac').optional().isMACAddress(),
-    body('image').optional().trim() // Image as a local file path (string)
+    body('image').optional().trim(), // Image as a local file path (string)
+    body('isnavigate').optional().isBoolean().default(false) // Add isnavigate with default false
   ]),
   asyncHandler(async (req, res) => {
-    const { name, password, phone_number, age, mac, image } = req.body;
+    const { name, password, phone_number, age, mac, image, isnavigate } = req.body;
 
     // 1. Check if user exists
     const exists = await db.query(
@@ -57,10 +58,10 @@ router.post('/signup',
 
     // 3. Create user
     const newUser = await db.query(
-      `INSERT INTO users (name, password, phone_number, age, mac, image)
-       VALUES ($1, $2, $3, $4, $5, $6)
-       RETURNING id, name, phone_number, age, mac, image`,
-      [name, hashedPassword, phone_number, age, mac, image]
+      `INSERT INTO users (name, password, phone_number, age, mac, image, isnavigate)
+       VALUES ($1, $2, $3, $4, $5, $6, $7)
+       RETURNING id, name, phone_number, age, mac, image, isnavigate`,
+      [name, hashedPassword, phone_number, age, mac, image, isnavigate || false]
     );
 
     // 4. Generate token
@@ -92,7 +93,7 @@ router.get('/all',
 
     // Get paginated users
     const result = await db.query(
-      `SELECT id, name, age, mac, phone_number, image
+      `SELECT id, name, age, mac, phone_number, image, isnavigate
        FROM users 
        LIMIT $1 OFFSET $2`,
       [limit, offset]
@@ -123,7 +124,7 @@ router.post('/login',
 
     // 1. Find user
     const user = await db.query(
-      `SELECT id, name, password, phone_number FROM users 
+      `SELECT id, name, password, phone_number, isnavigate FROM users 
        WHERE phone_number = $1`, 
       [phone_number]
     );
@@ -149,7 +150,8 @@ router.post('/login',
         user: {
           id: user.rows[0].id,
           name: user.rows[0].name,
-          phone_number: user.rows[0].phone_number
+          phone_number: user.rows[0].phone_number,
+          isnavigate: user.rows[0].isnavigate // Include isnavigate in login response
         }
       },
     });
@@ -161,7 +163,7 @@ router.get('/me',
   authenticate,
   asyncHandler(async (req, res) => {
     const result = await db.query(
-      `SELECT id, name, age, mac, phone_number, image
+      `SELECT id, name, age, mac, phone_number, image, isnavigate
        FROM users WHERE id = $1`,
       [req.user.userId]
     );
@@ -183,7 +185,7 @@ router.get('/:id',
     const { id } = req.params;
     
     const result = await db.query(
-      `SELECT id, name, age, mac, phone_number, image
+      `SELECT id, name, age, mac, phone_number, image, isnavigate
        FROM users WHERE id = $1`,
       [id]
     );
@@ -206,11 +208,12 @@ router.put('/:id',
     body('age').optional().isInt({ min: 1 }),
     body('mac').optional().isMACAddress(),
     body('phone_number').optional().isMobilePhone(),
-    body('image').optional().trim() // Image as a local file path (string)
+    body('image').optional().trim(), // Image as a local file path (string)
+    body('isnavigate').optional().isBoolean() // Add validation for isnavigate
   ]),
   asyncHandler(async (req, res) => {
     const { id } = req.params;
-    const { name, password, age, mac, phone_number, image } = req.body;
+    const { name, password, age, mac, phone_number, image, isnavigate } = req.body;
     
     // Ensure user can only update their own profile
     if (parseInt(id) !== req.user.userId) {
@@ -258,6 +261,12 @@ router.put('/:id',
       counter++;
     }
     
+    if (isnavigate !== undefined) { // Allow updating isnavigate
+      updates.push(`isnavigate = $${counter}`);
+      values.push(isnavigate);
+      counter++;
+    }
+    
     if (updates.length === 0) {
       return apiResponse(res, 400, null, 'No valid fields to update');
     }
@@ -267,7 +276,7 @@ router.put('/:id',
       UPDATE users SET
         ${updates.join(', ')}
       WHERE id = $${counter}
-      RETURNING id, name, age, mac, phone_number, image
+      RETURNING id, name, age, mac, phone_number, image, isnavigate
     `;
     
     const result = await db.query(query, values);
