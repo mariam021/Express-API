@@ -37,11 +37,12 @@ router.post('/signup',
     body('phone_number').isMobilePhone(),
     body('age').optional().isInt({ min: 1 }),
     body('mac').optional().isMACAddress(),
-    body('image').optional().trim(), // Image as a local file path (string)
-    body('isnavigate').optional().isBoolean().default(false) // Add isnavigate with default false
+    body('image').optional().trim(),
+    body('isnavigate').optional().isBoolean().default(false),
+    body('is_danger').optional().isBoolean().default(false)
   ]),
   asyncHandler(async (req, res) => {
-    const { name, password, phone_number, age, mac, image, isnavigate } = req.body;
+    const { name, password, phone_number, age, mac, image, isnavigate, is_danger } = req.body;
 
     // 1. Check if user exists
     const exists = await db.query(
@@ -58,10 +59,10 @@ router.post('/signup',
 
     // 3. Create user
     const newUser = await db.query(
-      `INSERT INTO users (name, password, phone_number, age, mac, image, isnavigate)
-       VALUES ($1, $2, $3, $4, $5, $6, $7)
-       RETURNING id, name, phone_number, age, mac, image, isnavigate`,
-      [name, hashedPassword, phone_number, age, mac, image, isnavigate || false]
+      `INSERT INTO users (name, password, phone_number, age, mac, image, isnavigate, is_danger)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+       RETURNING id, name, phone_number, age, mac, image, isnavigate, is_danger`,
+      [name, hashedPassword, phone_number, age, mac, image, isnavigate || false, is_danger || false]
     );
 
     // 4. Generate token
@@ -93,7 +94,7 @@ router.get('/all',
 
     // Get paginated users
     const result = await db.query(
-      `SELECT id, name, age, mac, phone_number, image, isnavigate
+      `SELECT id, name, age, mac, phone_number, image, isnavigate, is_danger
        FROM users 
        LIMIT $1 OFFSET $2`,
       [limit, offset]
@@ -124,7 +125,7 @@ router.post('/login',
 
     // 1. Find user
     const user = await db.query(
-      `SELECT id, name, password, phone_number, isnavigate FROM users 
+      `SELECT id, name, password, phone_number, isnavigate, is_danger FROM users 
        WHERE phone_number = $1`, 
       [phone_number]
     );
@@ -151,7 +152,8 @@ router.post('/login',
           id: user.rows[0].id,
           name: user.rows[0].name,
           phone_number: user.rows[0].phone_number,
-          isnavigate: user.rows[0].isnavigate // Include isnavigate in login response
+          isnavigate: user.rows[0].isnavigate,
+          is_danger: user.rows[0].is_danger
         }
       },
     });
@@ -163,7 +165,7 @@ router.get('/me',
   authenticate,
   asyncHandler(async (req, res) => {
     const result = await db.query(
-      `SELECT id, name, age, mac, phone_number, image, isnavigate
+      `SELECT id, name, age, mac, phone_number, image, isnavigate, is_danger
        FROM users WHERE id = $1`,
       [req.user.userId]
     );
@@ -185,7 +187,7 @@ router.get('/:id',
     const { id } = req.params;
     
     const result = await db.query(
-      `SELECT id, name, age, mac, phone_number, image, isnavigate
+      `SELECT id, name, age, mac, phone_number, image, isnavigate, is_danger
        FROM users WHERE id = $1`,
       [id]
     );
@@ -208,12 +210,13 @@ router.put('/:id',
     body('age').optional().isInt({ min: 1 }),
     body('mac').optional().isMACAddress(),
     body('phone_number').optional().isMobilePhone(),
-    body('image').optional().trim(), // Image as a local file path (string)
-    body('isnavigate').optional().isBoolean() // Add validation for isnavigate
+    body('image').optional().trim(),
+    body('isnavigate').optional().isBoolean(),
+    body('is_danger').optional().isBoolean()
   ]),
   asyncHandler(async (req, res) => {
     const { id } = req.params;
-    const { name, password, age, mac, phone_number, image, isnavigate } = req.body;
+    const { name, password, age, mac, phone_number, image, isnavigate, is_danger } = req.body;
     
     // Ensure user can only update their own profile
     if (parseInt(id) !== req.user.userId) {
@@ -255,15 +258,21 @@ router.put('/:id',
       counter++;
     }
     
-    if (image !== undefined) { // Allow null to clear the image
+    if (image !== undefined) {
       updates.push(`image = $${counter}`);
       values.push(image);
       counter++;
     }
     
-    if (isnavigate !== undefined) { // Allow updating isnavigate
+    if (isnavigate !== undefined) {
       updates.push(`isnavigate = $${counter}`);
       values.push(isnavigate);
+      counter++;
+    }
+    
+    if (is_danger !== undefined) {
+      updates.push(`is_danger = $${counter}`);
+      values.push(is_danger);
       counter++;
     }
     
@@ -276,7 +285,7 @@ router.put('/:id',
       UPDATE users SET
         ${updates.join(', ')}
       WHERE id = $${counter}
-      RETURNING id, name, age, mac, phone_number, image, isnavigate
+      RETURNING id, name, age, mac, phone_number, image, isnavigate, is_danger
     `;
     
     const result = await db.query(query, values);
