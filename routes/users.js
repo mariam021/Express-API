@@ -331,4 +331,38 @@ router.delete('/:id',
   })
 );
 
+// Forgot Password - Reset using phone number
+router.post('/forgot-password',
+  validateRequest([
+    body('phone_number').isMobilePhone(),
+    body('new_password').isLength({ min: 6 })
+  ]),
+  asyncHandler(async (req, res) => {
+    const { phone_number, new_password } = req.body;
+
+    // 1. Check if the user exists
+    const userResult = await db.query(
+      'SELECT id FROM users WHERE phone_number = $1',
+      [phone_number]
+    );
+
+    if (userResult.rows.length === 0) {
+      return apiResponse(res, 404, null, 'User with this phone number does not exist');
+    }
+
+    // 2. Hash the new password
+    const hashedPassword = await bcrypt.hash(new_password, 10);
+
+    // 3. Update the password
+    await db.query(
+      'UPDATE users SET password = $1 WHERE phone_number = $2',
+      [hashedPassword, phone_number]
+    );
+
+    // 4. Respond
+    apiResponse(res, 200, { success: true }, 'Password has been reset successfully');
+  })
+);
+
+
 export default router;
