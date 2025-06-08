@@ -201,7 +201,7 @@ router.get('/:id',
 );
 
 // Update user
-router.put('/:id',
+router.patch('/:id',
   authenticate,
   validateRequest([
     param('id').isInt().toInt(),
