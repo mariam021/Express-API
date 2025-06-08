@@ -114,7 +114,7 @@ router.post('/refresh',
 router.post('/forgot-password',
   validateRequest([
     body('phone_number').isMobilePhone(),
-    body('new_password').isLength({ min: 6 })
+    body('new_password').isLength({ min: 8 })
   ]),
   asyncHandler(async (req, res) => {
     const { phone_number, new_password } = req.body;
