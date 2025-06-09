@@ -143,5 +143,63 @@ router.post('/forgot-password',
   })
 );
 
+router.post('/send-reset-code',
+  validateRequest([
+    body('phone_number').isMobilePhone()
+  ]),
+  asyncHandler(async (req, res) => {
+    const { phone_number } = req.body;
+
+    // Check user exists
+    const userResult = await db.query(
+      'SELECT id FROM users WHERE phone_number = $1',
+      [phone_number]
+    );
+
+    if (userResult.rows.length === 0) {
+      return apiResponse(res, 404, null, 'User with this phone number does not exist');
+    }
+
+    // Generate 6-digit code
+    const code = Math.floor(100000 + Math.random() * 900000).toString();
+
+    // Save to temporary table or cache (in-memory for simplicity)
+    await db.query(
+      'INSERT INTO password_reset_codes (phone_number, code, expires_at) VALUES ($1, $2, NOW() + INTERVAL \'10 minutes\')',
+      [phone_number, code]
+    );
+
+    // TODO: Send SMS here (use Twilio or any SMS service)
+    console.log(`Send SMS to ${phone_number} with code: ${code}`);
+
+    return apiResponse(res, 200, { success: true }, 'Reset code sent via SMS');
+  })
+);
+
+router.post('/verify-reset-code',
+  validateRequest([
+    body('phone_number').isMobilePhone(),
+    body('code').isLength({ min: 6, max: 6 })
+  ]),
+  asyncHandler(async (req, res) => {
+    const { phone_number, code } = req.body;
+
+    const result = await db.query(
+      'SELECT * FROM password_reset_codes WHERE phone_number = $1 AND code = $2 AND expires_at > NOW()',
+      [phone_number, code]
+    );
+
+    if (result.rows.length === 0) {
+      return apiResponse(res, 400, null, 'Invalid or expired code');
+    }
+
+    // Optionally: delete code after use
+    await db.query('DELETE FROM password_reset_codes WHERE phone_number = $1', [phone_number]);
+
+    return apiResponse(res, 200, { verified: true }, 'Code verified');
+  })
+);
+
+
 
 export default router;
