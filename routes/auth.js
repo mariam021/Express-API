@@ -163,7 +163,13 @@ router.post('/send-reset-code',
     // Generate 6-digit code
     const code = Math.floor(100000 + Math.random() * 900000).toString();
 
-    // Save to temporary table or cache (in-memory for simplicity)
+    // Delete existing codes for this phone number to avoid unique constraint violation
+    await db.query(
+      'DELETE FROM password_reset_codes WHERE phone_number = $1',
+      [phone_number]
+    );
+
+    // Insert new code
     await db.query(
       'INSERT INTO password_reset_codes (phone_number, code, expires_at) VALUES ($1, $2, NOW() + INTERVAL \'10 minutes\')',
       [phone_number, code]
